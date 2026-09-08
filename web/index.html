@@ -74,21 +74,27 @@
         </div>
         <div id="terminal" hidden aria-label="交互终端"></div>
         <section id="monitor-view" class="monitor-view" hidden aria-label="资源监控面板">
-          <div class="monitor-heading"><div><span class="eyebrow">RESOURCE MONITOR</span><h2>运行环境</h2><p id="monitor-scope">正在读取资源统计…</p></div><span id="monitor-updated"></span></div>
-          <p id="monitor-error" class="form-error" role="alert"></p>
-          <div id="metric-cards" class="metric-cards"></div>
-          <div class="monitor-section-heading"><h3>GPU</h3><span>驱动可见设备 · 统计可能包含同卡其他进程</span></div>
-          <div id="gpu-cards" class="gpu-cards"></div>
-          <div class="monitor-section-heading"><h3>Session 资源</h3><span>CPU 100% = 1 核 · 内存为进程树 RSS 合计</span></div>
-          <div class="table-scroll"><table class="resource-table"><thead><tr><th>会话</th><th>分组</th><th>状态</th><th>进程数</th><th>CPU</th><th>内存 RSS</th><th></th></tr></thead><tbody id="session-resources"></tbody></table></div>
-          <p class="monitor-note">共享内存页可能在多个进程的 RSS 中重复计算。进程脱离会话进程树后不计入该会话；页面不可见时暂停刷新，首次或长时间未采样的速率显示为 —。</p>
+          <div class="monitor-content">
+            <div class="monitor-heading"><div><span class="eyebrow">RESOURCE MONITOR</span><h2>资源总览</h2><p id="monitor-scope">正在读取运行环境…</p></div><div class="monitor-update"><span id="monitor-updated">正在采样</span><button id="monitor-refresh" title="获取最新的资源采样">↻ 刷新</button></div></div>
+            <p id="monitor-error" class="form-error" role="alert"></p>
+            <p id="monitor-warmup" class="monitor-note" hidden>正在采集速率，下一次采样后自动显示。</p>
+            <div id="metric-cards" class="metric-cards"></div>
+            <div class="monitor-section-heading"><h3>GPU 设备</h3><span>设备整体用量，可能包含其他进程</span></div>
+            <div id="gpu-cards" class="gpu-cards"></div>
+            <p id="gpu-note" class="monitor-empty" hidden></p>
+            <p id="gpu-scope" class="monitor-note" hidden></p>
+            <div class="monitor-section-heading"><h3>会话资源 <span id="resource-session-count" class="count-badge"></span></h3><span>CPU 100% = 1 核 · 内存为进程树 RSS 合计</span></div>
+            <div class="table-scroll"><table class="resource-table"><thead><tr><th>会话</th><th>分组</th><th>状态</th><th>进程数</th><th>CPU</th><th>内存 RSS</th><th>操作</th></tr></thead><tbody id="session-resources"></tbody></table></div>
+            <p id="session-resources-empty" class="monitor-empty" hidden>暂无会话。新建终端后，这里会显示对应的进程资源。</p>
+            <details class="monitor-help"><summary>统计范围与说明</summary><p>CPU、内存和进程数优先统计当前 cgroup，卡片会注明范围。工作目录存储为所在文件系统的用量，网络统计不含本地回环接口。GPU 利用率和显存占用分别显示。</p><p>共享内存页可能在多个进程的 RSS 中重复计算；脱离会话进程树的进程不计入该会话。首次采样或页面长时间不可见后，速率需要下一次采样才能显示。不可读取的指标显示为 —。</p></details>
+          </div>
         </section>
         <div id="reconnect-banner" class="reconnect-banner" hidden><span id="reconnect-text">连接已断开，正在重新连接…</span><button id="reconnect-now">立即重连</button></div>
         <footer class="statusbar">
           <span><span id="connection-dot" class="dot muted"></span><span id="connection-status">准备就绪</span></span>
           <span id="terminal-size"></span>
           <span class="keyboard-hint">Shift + 拖选复制 · 滚轮查看历史</span>
-          <div class="zoom"><button id="zoom-out" aria-label="缩小字体">−</button><span id="font-size">14px</span><button id="zoom-in" aria-label="放大字体">＋</button></div>
+          <div class="zoom" title="终端字号"><button id="zoom-out" aria-label="缩小字体">−</button><span id="font-size">16px</span><button id="zoom-in" aria-label="放大字体">＋</button></div>
         </footer>
         <nav class="keybar" aria-label="终端快捷键"><button data-key="esc">Esc</button><button data-key="tab">Tab</button><button data-key="interrupt">Ctrl+C</button><button data-key="suspend">Ctrl+Z</button><button data-key="eof">Ctrl+D</button><button data-key="word">Ctrl+W</button><button data-key="transpose">Ctrl+T</button><button data-key="next">Ctrl+N</button><button data-key="clear">Ctrl+L</button><button data-key="slash" title="发送 Ctrl+/（终端控制字符 0x1f）">Ctrl+/</button><button data-key="up">↑</button><button data-key="down">↓</button></nav>
       </section>

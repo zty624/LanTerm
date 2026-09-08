@@ -1,10 +1,11 @@
 const $ = (id) => document.getElementById(id);
 const el = (tag, className, text = '') => {
-  const item = document.createElement(tag);
-  item.className = className;
-  item.textContent = text;
-  return item;
+  const node = document.createElement(tag);
+  node.className = className;
+  node.textContent = text;
+  return node;
 };
+const text = (node, value) => { if (node.textContent !== String(value)) node.textContent = value; };
 export const bytes = (value) => {
   if (value === null || value === undefined) return '—';
   const unit = Math.min(4, Math.max(0, Math.floor(Math.log2(value || 1) / 10)));
@@ -15,32 +16,109 @@ const percent = (value) => value === null || value === undefined ? '—' : `${nu
 const speed = (value) => value === null || value === undefined ? '—' : `${bytes(value)}/s`;
 export const age = (seconds) => seconds < 60 ? `${Math.floor(seconds)} 秒` : seconds < 3600 ? `${Math.floor(seconds / 60)} 分钟` : `${(seconds / 3600).toFixed(1)} 小时`;
 
-function sparkline(history, key) {
-  const points = history.filter((item) => item[key] !== null && item.timestamp >= Date.now() / 1000 - 360);
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 260 36');
-  svg.setAttribute('class', 'sparkline');
-  svg.setAttribute('aria-label', '最近采样趋势');
-  if (points.length < 2) return svg;
-  const min = points[0].timestamp;
-  const span = points.at(-1).timestamp - min || 1;
-  const max = Math.max(...points.map((item) => item[key]), 1);
-  const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  line.setAttribute('points', points.map((item) => `${(item.timestamp - min) / span * 260},${34 - item[key] / max * 30}`).join(' '));
-  svg.append(line);
-  return svg;
+// Keep existing nodes and focus while measurements change underneath them.
+function reconcile(parent, items, create, update) {
+  const old = new Map([...parent.children].map((node) => [node.dataset.key, node]));
+  items.forEach((item, index) => {
+    const key = String(item.key);
+    const node = old.get(key) || create(item);
+    node.dataset.key = key;
+    old.delete(key);
+    update(node, item);
+    if (parent.children[index] !== node) parent.insertBefore(node, parent.children[index] || null);
+  });
+  for (const node of old.values()) node.remove();
 }
 
-function card(title, value, detail, ratio) {
-  const node = el('article', 'metric-card');
-  node.append(el('span', 'metric-label', title), el('strong', 'metric-value', value), el('p', 'metric-detail', detail));
-  if (ratio !== null && Number.isFinite(ratio)) {
-    const bar = el('div', 'meter');
-    const fill = el('span', ratio > 90 ? 'high' : '');
-    fill.style.width = `${Math.min(100, Math.max(0, ratio))}%`;
-    bar.append(fill); node.append(bar);
+function meter() {
+  const block = el('div', 'meter-block');
+  const heading = el('div', 'meter-heading');
+  heading.append(el('span', ''), el('strong', ''));
+  const bar = el('div', 'meter'); bar.append(el('span', ''));
+  block.append(heading, bar);
+  return block;
+}
+
+function updateMeter(node, label, ratio, caption) {
+  text(node.querySelector('.meter-heading span'), label);
+  text(node.querySelector('.meter-heading strong'), caption);
+  const bar = node.querySelector('.meter');
+  const valid = Number.isFinite(ratio);
+  bar.hidden = !valid;
+  if (!valid) return;
+  const value = Math.min(100, Math.max(0, ratio));
+  bar.setAttribute('role', 'meter');
+  bar.setAttribute('aria-label', label);
+  bar.setAttribute('aria-valuemin', '0');
+  bar.setAttribute('aria-valuemax', '100');
+  bar.setAttribute('aria-valuenow', String(value));
+  bar.setAttribute('aria-valuetext', percent(ratio));
+  bar.firstElementChild.style.width = `${value}%`;
+  bar.firstElementChild.classList.toggle('high', ratio > 90);
+}
+
+function updateTrend(node, history, key, limit) {
+  const points = history.filter((item) => Number.isFinite(item[key]) && item.timestamp >= Date.now() / 1000 - 360);
+  if (!node.firstElementChild) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 260 36'); svg.setAttribute('preserveAspectRatio', 'none'); svg.setAttribute('class', 'sparkline'); svg.setAttribute('role', 'img');
+    svg.append(document.createElementNS(svg.namespaceURI, 'polyline'));
+    node.append(svg);
   }
+  const svg = node.firstElementChild;
+  const max = limit || Math.max(...points.map((item) => item[key]), 1);
+  svg.setAttribute('aria-label', `${key === 'cpu' ? 'CPU' : '内存'} 最近 6 分钟，刻度 0–${key === 'cpu' ? `${max}%` : bytes(max)}`);
+  node.title = svg.getAttribute('aria-label');
+  const end = points.at(-1)?.timestamp || 0;
+  svg.firstElementChild.setAttribute('points', points.map((item) => `${260 - (end - item.timestamp) / 360 * 260},${34 - Math.min(1, item[key] / max) * 30}`).join(' '));
+}
+
+function card() {
+  const node = el('article', 'metric-card');
+  const heading = el('div', 'metric-heading'); heading.append(el('span', 'metric-label'), el('span', 'metric-scope'));
+  const primary = el('div', 'metric-primary'); primary.append(el('strong', 'metric-value'), el('div', 'metric-trend'));
+  const pair = el('div', 'metric-pair');
+  for (let i = 0; i < 2; i++) { const column = el('div', ''); column.append(el('span', ''), el('strong', '')); pair.append(column); }
+  node.append(heading, primary, pair, el('p', 'metric-detail'), meter(), el('p', 'metric-foot'));
   return node;
+}
+
+function updateCard(node, data) {
+  node.classList.toggle('compact', !!data.pair || data.key === 'pids');
+  text(node.querySelector('.metric-label'), data.title);
+  text(node.querySelector('.metric-scope'), data.scope);
+  const value = node.querySelector('.metric-value');
+  text(value, data.value); node.querySelector('.metric-primary').hidden = !!data.pair;
+  value.classList.toggle('pending', data.value === '采样中' || data.value === '—');
+  const pair = node.querySelector('.metric-pair'); pair.hidden = !data.pair;
+  data.pair?.forEach(([label, amount], index) => { text(pair.children[index].firstElementChild, label); text(pair.children[index].lastElementChild, amount); });
+  text(node.querySelector('.metric-detail'), data.detail);
+  text(node.querySelector('.metric-foot'), data.foot || '');
+  node.querySelector('.metric-foot').title = data.foot || '';
+  const bar = node.querySelector('.meter-block'); bar.hidden = !Number.isFinite(data.ratio);
+  updateMeter(bar, data.meterLabel || `${data.title}使用率`, data.ratio, percent(data.ratio));
+  node.querySelector('.metric-trend').hidden = !data.trend;
+  if (data.trend) updateTrend(node.querySelector('.metric-trend'), ...data.trend);
+}
+
+function gpuCard() {
+  const node = el('article', 'gpu-card');
+  const heading = el('div', 'gpu-heading'); heading.append(el('span', 'gpu-index'), el('h4', ''), el('p', 'gpu-thermal'));
+  const values = el('div', 'gpu-values');
+  for (const kind of ['utilization', 'memory']) { const block = meter(); block.dataset.metric = kind; values.append(block); }
+  node.append(heading, values, el('p', 'gpu-memory'));
+  return node;
+}
+
+function updateGpu(node, gpu) {
+  text(node.querySelector('.gpu-index'), `GPU ${gpu.index}`);
+  text(node.querySelector('h4'), gpu.name);
+  text(node.querySelector('.gpu-thermal'), `${num(gpu.temperature, 0)} °C  ·  ${num(gpu.power)} W`);
+  const ratio = gpu.memory_total && gpu.memory_used !== null ? gpu.memory_used / gpu.memory_total * 100 : null;
+  updateMeter(node.querySelector('[data-metric="utilization"]'), `GPU ${gpu.index} 利用率`, gpu.utilization, percent(gpu.utilization));
+  updateMeter(node.querySelector('[data-metric="memory"]'), `GPU ${gpu.index} 显存占用`, ratio, percent(ratio));
+  text(node.querySelector('.gpu-memory'), `显存已用 ${bytes(gpu.memory_used)} / ${bytes(gpu.memory_total)}`);
+  node.title = gpu.uuid;
 }
 
 export class ResourceView {
@@ -52,64 +130,94 @@ export class ResourceView {
     this.busy = false;
     this.detailBusy = false;
     this.data = null;
+    this.visible = false;
+    this.timer = null;
+    this.controller = null;
+    this.generation = 0;
   }
 
+  reset() {
+    this.generation += 1;
+    this.setVisible(false);
+    this.controller?.abort(); this.controller = null;
+    this.busy = false; this.detailBusy = false; this.data = null;
+  }
+
+  setVisible(visible) {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    clearTimeout(this.timer);
+    if (visible) this.refresh();
+  }
+
+  resume() { if (this.visible) this.refresh(); }
+
   async refresh() {
-    if (this.busy || !this.allowed()) return;
+    if (this.busy || !this.allowed() || !this.visible || document.hidden) return;
+    clearTimeout(this.timer);
     this.busy = true;
+    const generation = this.generation;
+    const controller = new AbortController(); this.controller = controller;
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    $('monitor-refresh').disabled = true;
     try {
-      const data = await this.api('/metrics');
-      if (!this.allowed()) return;
+      const data = await this.api('/metrics', 'GET', undefined, controller.signal);
+      if (!this.allowed() || generation !== this.generation) return;
       this.data = data;
       this.render(data);
       $('monitor-error').textContent = '';
     } catch (error) {
-      $('monitor-error').textContent = `统计更新失败：${error.message}。当前显示的是上一次采样。`;
-    } finally { this.busy = false; }
+      if (generation !== this.generation) return;
+      $('monitor-error').textContent = `统计更新失败：${error.name === 'AbortError' ? '请求超时' : error.message}${this.data ? '。保留上次采样，稍后自动重试。' : '。稍后自动重试。'}`;
+    } finally {
+      clearTimeout(timeout);
+      if (generation === this.generation) {
+        this.busy = false; this.controller = null; $('monitor-refresh').disabled = false;
+        if (this.visible && this.allowed() && !document.hidden) this.timer = setTimeout(() => this.refresh(), 3000);
+      }
+    }
   }
 
   render(data) {
     const { environment: env, cpu, memory, disk, network, io, pids } = data;
-    const label = (scope) => ({ cgroup: '当前 cgroup', host: '主机', unavailable: '不可用' })[scope];
-    $('monitor-scope').textContent = `${env.hostname} · ${env.container ? '容器环境' : 'Linux 主机'} · ${env.cgroup_version ? `cgroup v${env.cgroup_version}` : '未发现 cgroup'}`;
+    const scope = (value) => ({ cgroup: '当前 cgroup', host: '主机', unavailable: '不可用' })[value];
+    text($('monitor-scope'), `${env.hostname} · ${env.container ? '容器环境' : 'Linux 主机'} · ${env.cgroup_version ? `cgroup v${env.cgroup_version}` : '未发现 cgroup'}`);
     $('monitor-scope').title = env.cgroup_path || '未发现可读取的 cgroup';
-    $('monitor-updated').textContent = `采样于 ${new Date(data.timestamp * 1000).toLocaleTimeString()} · 每 ${data.interval} 秒刷新`;
-    const cpuCard = card(`CPU · ${label(cpu.scope)}`, percent(cpu.percent), `${num(cpu.cores_used, 2)} / ${num(cpu.cores_limit, 2)} 核${cpu.quota_cores === null ? ' · CPU 亲和性上限' : ' · 按配额归一化'}${cpu.shared_limit ? ' · 上级共享配额' : ''}`, cpu.percent);
-    cpuCard.append(sparkline(data.history, 'cpu'));
-    const memRatio = memory.limit && memory.used !== null ? memory.used / memory.limit * 100 : null;
-    const memCard = card(`内存 · ${label(memory.scope)}`, bytes(memory.used), `${memory.limit === null ? '未设置可见内存上限' : `上限 ${bytes(memory.limit)}`}${memory.shared_limit ? ' · 上级共享配额' : ''} · OOM ${memory.oom_kills ?? '—'}`, memRatio);
-    memCard.append(sparkline(data.history, 'memory'));
-    $('metric-cards').replaceChildren(
-      cpuCard, memCard,
-      card('工作目录文件系统', disk ? bytes(disk.free) : '—', disk ? `剩余 / 共 ${bytes(disk.total)} · ${disk.path}` : '无法读取目录所在文件系统', disk?.percent ?? null),
-      card('网络 · 当前网络命名空间', `↓ ${speed(network.rx_rate)}`, `↑ ${speed(network.tx_rate)} · 不含 loopback`, null),
-      card('磁盘 I/O · 当前 cgroup', speed(io.read_rate), `写入 ${speed(io.write_rate)} · 未提供计数器时显示 —`, null),
-      card('进程 / 线程 · 当前 cgroup', String(pids.current ?? '—'), `上限 ${pids.limit ?? '未设置'} · CPU 累计限流 ${num(cpu.throttled_seconds, 2)} 秒`, pids.limit && pids.current !== null ? pids.current / pids.limit * 100 : null),
-    );
-    const gpuCards = data.gpu.devices.map((gpu) => {
-      const ratio = gpu.memory_total && gpu.memory_used !== null ? gpu.memory_used / gpu.memory_total * 100 : null;
-      const node = card(`GPU ${gpu.index} · ${gpu.name}`, percent(gpu.utilization), `显存 ${bytes(gpu.memory_used)} / ${bytes(gpu.memory_total)} · ${num(gpu.temperature, 0)} °C · ${num(gpu.power)} W`, ratio);
-      node.title = gpu.uuid;
-      return node;
-    });
-    if (!gpuCards.length) gpuCards.push(el('p', 'monitor-note', data.gpu.reason || '未发现可见 GPU'));
-    if (env.cuda_visible_devices !== null) gpuCards.push(el('p', 'monitor-note', `CUDA_VISIBLE_DEVICES=${env.cuda_visible_devices}；上方为驱动可见设备的总量，未折算为单个会话或 MIG 配额。`));
-    $('gpu-cards').replaceChildren(...gpuCards);
-    const rows = this.getSessions().map((item) => {
-      const value = data.sessions[item.id];
-      const row = el('tr', '');
-      row.dataset.sid = item.id;
-      for (const text of [item.name, item.group || '未分组', item.status === 'exited' ? '已退出' : '运行中', value?.process_count ?? '—', percent(value?.cpu_percent), bytes(value?.rss_bytes)]) row.append(el('td', '', String(text)));
+    text($('monitor-updated'), `${new Date(data.timestamp * 1000).toLocaleTimeString([], { hour12: false })} 更新 · 约 3 秒 / 次`);
+    $('monitor-warmup').hidden = !(cpu.percent === null && cpu.scope !== 'unavailable') && network.rx_rate !== null;
+    const memoryRatio = memory.limit && memory.used !== null ? memory.used / memory.limit * 100 : null;
+    const cards = [
+      { key: 'cpu', title: 'CPU', scope: scope(cpu.scope), value: cpu.percent === null && cpu.scope !== 'unavailable' ? '采样中' : percent(cpu.percent), detail: `已用 ${num(cpu.cores_used, 2)} / 可用 ${num(cpu.cores_limit, 2)} 核`, foot: `${cpu.quota_cores === null ? '按 CPU 亲和性上限计算' : '按 CPU 配额计算'}${cpu.shared_limit ? ' · 上级共享配额' : ''}`, ratio: cpu.percent, trend: [data.history, 'cpu', 100] },
+      { key: 'memory', title: '内存', scope: scope(memory.scope), value: bytes(memory.used), detail: memory.limit === null ? '未设置可见内存上限' : `上限 ${bytes(memory.limit)}${memory.shared_limit ? ' · 上级共享配额' : ''}`, foot: `内存不足终止 ${memory.oom_kills ?? '—'} 次`, ratio: memoryRatio, trend: [data.history, 'memory', memory.limit] },
+      { key: 'disk', title: '存储空间', scope: '工作目录文件系统', value: percent(disk?.percent), detail: disk ? `已用 ${bytes(disk.used)} / ${bytes(disk.total)}` : '无法读取文件系统', foot: disk ? `可用 ${bytes(disk.free)} · ${disk.path}` : '', ratio: disk?.percent, meterLabel: '存储已用比例' },
+      { key: 'network', title: '网络速率', scope: '当前网络空间', value: '', pair: [['↓ 接收', speed(network.rx_rate)], ['↑ 发送', speed(network.tx_rate)]], detail: '不含本地回环接口', ratio: null },
+      { key: 'io', title: '磁盘 I/O', scope: '当前 cgroup', value: '', pair: [['读取', speed(io.read_rate)], ['写入', speed(io.write_rate)]], detail: io.read_rate === null && io.write_rate === null ? '等待采样或计数器不可用' : '当前资源组的读写速率', ratio: null },
+      { key: 'pids', title: '进程 / 线程', scope: '当前 cgroup', value: String(pids.current ?? '—'), detail: `上限 ${pids.limit ?? '未设置'} · CPU 累计限流 ${num(cpu.throttled_seconds, 2)} 秒`, ratio: pids.limit && pids.current !== null ? pids.current / pids.limit * 100 : null },
+    ];
+    reconcile($('metric-cards'), cards, card, updateCard);
+    const devices = data.gpu.devices.map((gpu) => ({ ...gpu, key: gpu.uuid }));
+    reconcile($('gpu-cards'), devices, gpuCard, updateGpu);
+    text($('gpu-note'), devices.length ? '' : data.gpu.reason || '未发现可见 GPU');
+    $('gpu-note').hidden = !!devices.length;
+    text($('gpu-scope'), env.cuda_visible_devices === null ? '' : `CUDA_VISIBLE_DEVICES=${env.cuda_visible_devices} · 显示驱动可见设备整体用量`);
+    $('gpu-scope').hidden = env.cuda_visible_devices === null;
+    const items = this.getSessions().map((item) => ({ ...item, key: item.id }));
+    text($('resource-session-count'), items.length);
+    reconcile($('session-resources'), items, (item) => {
+      const row = el('tr', ''); row.dataset.sid = item.id;
+      for (let i = 0; i < 6; i++) row.append(el('td', ''));
       const cell = el('td', 'row-actions');
-      const details = el('button', '', '进程');
-      details.addEventListener('click', () => this.showSession(item.id));
-      const attach = el('button', '', '连接');
-      attach.addEventListener('click', () => this.select(item.id));
+      const details = el('button', '', '进程'); details.addEventListener('click', () => this.showSession(item.id));
+      const attach = el('button', '', '连接'); attach.addEventListener('click', () => this.select(item.id));
       cell.append(details, attach); row.append(cell);
       return row;
+    }, (row, item) => {
+      const value = data.sessions[item.id];
+      [item.name, item.group || '未分组', item.status === 'exited' ? '已退出' : '运行中', value?.process_count ?? '—', percent(value?.cpu_percent), bytes(value?.rss_bytes)].forEach((value, index) => text(row.children[index], String(value)));
+      row.children[0].title = item.name;
+      row.children[2].dataset.state = item.status;
     });
-    if (!rows.length) { const row = el('tr', ''); const cell = el('td', 'monitor-note', '尚无会话，新建一个终端后即可查看会话资源。'); cell.colSpan = 7; row.append(cell); rows.push(row); }
-    $('session-resources').replaceChildren(...rows);
+    $('session-resources-empty').hidden = items.length > 0;
   }
 
   async showSession(sid) {
@@ -124,26 +232,25 @@ export class ResourceView {
   async refreshSession() {
     if (this.detailBusy || !$('details-dialog').open || !this.allowed()) return;
     this.detailBusy = true;
+    const generation = this.generation;
     const sid = $('details-dialog').dataset.sid;
     try {
       const item = await this.api(`/sessions/${sid}`);
-      if (!this.allowed() || sid !== $('details-dialog').dataset.sid) return;
-      $('details-title').textContent = item.name;
+      if (!this.allowed() || generation !== this.generation || sid !== $('details-dialog').dataset.sid) return;
+      text($('details-title'), item.name);
       const entries = [
         ['Shell', item.shell], ['分组', item.group || '未分组'], ['标签', item.tags.join(' · ') || '—'],
         ['创建时间', new Date(item.created * 1000).toLocaleString()],
         ['最近活动', new Date(item.activity * 1000).toLocaleString()], ['已连接浏览器', String(item.clients)],
         ['初始目录', item.cwd], ['当前目录', item.resources?.cwd || '无法读取 / 已退出'],
-      ];
-      $('details-summary').replaceChildren(...entries.map(([key, value]) => { const node = el('div', ''); node.append(el('span', '', key), el('strong', '', value)); return node; }));
-      $('details-note').textContent = item.note;
-      $('process-table').replaceChildren(...(item.resources?.processes || []).map((proc) => {
-        const row = el('tr', '');
-        for (const value of [proc.pid, proc.name, proc.status, percent(proc.cpu_percent), bytes(proc.rss_bytes), age(proc.age_seconds)]) row.append(el('td', '', String(value)));
-        return row;
-      }));
-      $('details-error').textContent = item.status === 'exited' ? 'Shell 已退出，可通过“重新启动”继续使用此会话。' : '';
-    } catch (error) { $('details-error').textContent = error.message; }
-    finally { this.detailBusy = false; }
+      ].map(([key, value]) => ({ key, value }));
+      reconcile($('details-summary'), entries, () => { const node = el('div', ''); node.append(el('span', ''), el('strong', '')); return node; }, (node, entry) => { text(node.firstElementChild, entry.key); text(node.lastElementChild, entry.value); });
+      text($('details-note'), item.note);
+      reconcile($('process-table'), (item.resources?.processes || []).map((proc) => ({ ...proc, key: proc.pid })), () => { const row = el('tr', ''); for (let i = 0; i < 6; i++) row.append(el('td', '')); return row; }, (row, proc) => {
+        [proc.pid, proc.name, proc.status, percent(proc.cpu_percent), bytes(proc.rss_bytes), age(proc.age_seconds)].forEach((value, index) => text(row.children[index], String(value)));
+      });
+      text($('details-error'), item.status === 'exited' ? 'Shell 已退出，可通过“重新启动”继续使用此会话。' : '');
+    } catch (error) { if (generation === this.generation) $('details-error').textContent = error.message; }
+    finally { if (generation === this.generation) this.detailBusy = false; }
   }
 }

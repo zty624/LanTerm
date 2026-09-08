@@ -264,8 +264,10 @@ test('session organization, batch actions and resource dashboard preserve termin
   await expect(page.locator('#details-note')).toHaveText('检查模型输出');
   await expect(page.locator('#process-table')).toContainText('bash');
   await page.getByRole('button', { name: '关闭详情', exact: true }).click();
+  await page.locator('#monitor-view').evaluate((node) => { node.scrollTop = 0; });
   await page.screenshot({ path: '.runtime/monitor-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#monitor-view').evaluate((node) => { node.scrollTop = 0; });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: '.runtime/monitor-mobile.png' });
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -281,5 +283,65 @@ test('session organization, batch actions and resource dashboard preserve termin
   await page.getByRole('button', { name: '结束所选会话', exact: true }).click();
   await expect(page.locator('.session-item')).toHaveCount(1);
   await expect(page.locator('#active-name')).toHaveText('Training A');
+  expect(errors).toEqual([]);
+});
+
+test('resource gauges match their labels and refresh preserves focus and scroll', async ({ page, service }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Resource inspection');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  const base = await (await page.request.get(service.url + '/api/metrics')).json();
+  const gib = 2 ** 30;
+  let utilization = 75;
+  let calls = 0;
+  await page.route('**/api/metrics', async (route) => {
+    calls += 1;
+    const data = structuredClone(base);
+    data.timestamp = Date.now() / 1000;
+    data.cpu = { ...data.cpu, percent: 25, cores_used: 2, cores_limit: 8 };
+    data.memory = { ...data.memory, used: 8 * gib, limit: 32 * gib };
+    data.disk = { path: service.folder, used: 800 * gib, free: 200 * gib, total: 1000 * gib, percent: 80 };
+    data.network = { rx_rate: 12 * 1024 ** 2, tx_rate: 1024 ** 2 };
+    data.io = { read_rate: 32 * 1024 ** 2, write_rate: 2 * 1024 ** 2 };
+    data.gpu = { status: 'ok', reason: '', devices: [{ index: '0', uuid: 'test-gpu', name: 'GPU display fixture', utilization, memory_used: 2 * gib, memory_total: 8 * gib, temperature: 48, power: 55 }] };
+    data.history = [{ timestamp: data.timestamp - 3, cpu: 20, memory: 7 * gib }, { timestamp: data.timestamp, cpu: 25, memory: 8 * gib }];
+    await route.fulfill({ json: data });
+  });
+  await page.locator('#show-monitor').click();
+  const disk = page.locator('.metric-card[data-key="disk"]');
+  await expect(disk.locator('.metric-value')).toHaveText('80.0%');
+  await expect(disk).toContainText('可用 200.0 GiB');
+  await expect(page.getByRole('meter', { name: '存储已用比例' })).toHaveAttribute('aria-valuenow', '80');
+  await expect(page.getByRole('meter', { name: 'GPU 0 利用率', exact: true })).toHaveAttribute('aria-valuenow', '75');
+  await expect(page.getByRole('meter', { name: 'GPU 0 显存占用', exact: true })).toHaveAttribute('aria-valuenow', '25');
+  const button = page.locator('#session-resources').getByRole('button', { name: '进程', exact: true });
+  await button.focus();
+  const scroll = await page.locator('#monitor-view').evaluate((node) => node.scrollTop);
+  utilization = 50;
+  await expect(page.getByRole('meter', { name: 'GPU 0 利用率', exact: true })).toHaveAttribute('aria-valuenow', '50');
+  await expect(button).toBeFocused();
+  expect(await page.locator('#monitor-view').evaluate((node) => node.scrollTop)).toBe(scroll);
+  await button.press('Enter');
+  await expect(page.locator('#details-title')).toHaveText('Resource inspection');
+  await page.getByRole('button', { name: '关闭详情', exact: true }).click();
+  for (const width of [1440, 1100, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.locator('#monitor-view').evaluate((node) => { node.scrollTop = 0; });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.locator('.metric-card[data-key="memory"]')).toBeVisible();
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.locator('#monitor-view').evaluate((node) => { node.scrollTop = 0; });
+  await page.screenshot({ path: '.runtime/monitor-populated.png' });
+  // A hidden resource view stops polling, while the selected terminal stays connected.
+  await page.locator('#show-monitor').click();
+  const stoppedAt = calls;
+  await page.waitForTimeout(3400);
+  expect(calls).toBe(stoppedAt);
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
   expect(errors).toEqual([]);
 });

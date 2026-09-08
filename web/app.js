@@ -12,8 +12,9 @@ const encoder = new TextEncoder();
 const state = { config: null, sessions: [], active: null, term: null, ws: null, fit: null, search: null, retry: null, retries: 0, generation: 0, editing: null, loggedIn: false, refreshing: false, view: 'terminal', batch: false, selected: new Set(), batchIds: [], batchAction: '' };
 const resources = new ResourceView(api, () => state.sessions, select, () => state.loggedIn);
 const plugins = new SessionStatus(api, () => state.loggedIn);
+const sessionView = (items) => items.map(({ activity, ...item }) => ({ ...item, activity: $('session-sort').value === 'activity' ? activity : null }));
 let toastTimer;
-let fontSize = Math.min(24, Math.max(10, Number(localStorage.getItem('lt-font')) || 14));
+let fontSize = Math.min(28, Math.max(10, Number(localStorage.getItem('lt-font')) || 16));
 
 class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
@@ -69,7 +70,7 @@ function showLogin() {
   $('workspace').hidden = true;
   $('login-screen').hidden = false;
   $('password').focus();
-  resources.data = null;
+  resources.reset();
 }
 
 function filteredSessions() {
@@ -161,6 +162,7 @@ function render() {
   $('empty-state').hidden = !!item || monitoring;
   $('terminal').hidden = !item || monitoring;
   $('monitor-view').hidden = !monitoring;
+  resources.setVisible(monitoring);
   $('show-monitor').textContent = monitoring ? '返回终端' : '资源监控';
   document.body.classList.toggle('resources-open', monitoring);
   if (monitoring) $('search-bar').hidden = true;
@@ -171,13 +173,15 @@ async function refresh() {
   if (!state.loggedIn || state.refreshing) return;
   state.refreshing = true;
   try {
-    state.sessions = await api('/sessions');
+    const sessions = await api('/sessions');
+    const changed = JSON.stringify(sessionView(sessions)) !== JSON.stringify(sessionView(state.sessions));
+    state.sessions = sessions;
     if (state.active && !active()) {
       disconnect(); state.active = null;
     }
     if (!state.active && state.sessions.length) {
       select(state.sessions[0].id);
-    } else {
+    } else if (changed) {
       render();
     }
   } finally { state.refreshing = false; }
@@ -429,7 +433,8 @@ bind('clear-selected', () => { state.selected.clear(); render(); });
 bind('batch-group', () => prepareBatch('group'));
 bind('batch-pin', () => prepareBatch('pin'));
 bind('batch-close', () => prepareBatch('close'));
-bind('show-monitor', async () => { state.view = state.view === 'resources' ? 'terminal' : 'resources'; render(); if (state.view === 'resources') await resources.refresh(); else { fit(); state.term?.focus(); } });
+bind('show-monitor', () => { state.view = state.view === 'resources' ? 'terminal' : 'resources'; render(); if (state.view === 'terminal') { fit(); state.term?.focus(); } });
+bind('monitor-refresh', () => resources.refresh());
 for (const id of ['filter-query', 'filter-group', 'filter-status', 'session-sort']) $(id).addEventListener(id === 'filter-query' ? 'input' : 'change', render);
 bind('close-session', () => { if (!active()) return; $('close-name').textContent = active().name; $('confirm-dialog').dataset.sid = state.active; $('close-error').textContent = ''; $('confirm-dialog').showModal(); });
 bind('restart-session', async () => { await api(`/sessions/${state.active}/restart`, 'POST'); await refresh(); connect(); });
@@ -447,7 +452,7 @@ bind('search-next', () => state.search?.findNext($('search-input').value));
 bind('search-prev', () => state.search?.findPrevious($('search-input').value));
 $('search-input').addEventListener('input', () => state.search?.findNext($('search-input').value, { incremental: true }));
 $('search-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') state.search?.[event.shiftKey ? 'findPrevious' : 'findNext']($('search-input').value); if (event.key === 'Escape') $('search-close').click(); });
-function zoom(delta) { fontSize = Math.min(24, Math.max(10, fontSize + delta)); localStorage.setItem('lt-font', fontSize); $('font-size').textContent = `${fontSize}px`; if (state.term) { state.term.options.fontSize = fontSize; fit(); } }
+function zoom(delta) { fontSize = Math.min(28, Math.max(10, fontSize + delta)); localStorage.setItem('lt-font', fontSize); $('font-size').textContent = `${fontSize}px`; if (state.term) { state.term.options.fontSize = fontSize; fit(); } }
 bind('zoom-out', () => zoom(-1)); bind('zoom-in', () => zoom(1));
 document.addEventListener('keydown', (event) => {
   if (!state.loggedIn || document.querySelector('dialog[open]')) return;
@@ -457,8 +462,8 @@ document.addEventListener('keydown', (event) => {
 new ResizeObserver(() => requestAnimationFrame(fit)).observe($('terminal'));
 matchMedia('(max-width: 700px)').addEventListener('change', (event) => { document.body.classList.toggle('sidebar-hidden', event.matches); fit(); });
 window.addEventListener('online', () => { if (state.loggedIn && state.ws?.readyState !== WebSocket.OPEN) connect(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && state.loggedIn) { refresh().catch(report); plugins.refresh(); } });
-setInterval(() => { if (!document.hidden) plugins.refresh(); }, 2000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.loggedIn) { refresh().catch(report); plugins.refresh(); resources.resume(); } });
+setInterval(() => { if (!document.hidden) plugins.refresh(); }, 500);
 setInterval(() => { if (state.loggedIn && !document.hidden) refresh().catch((error) => { if (error.status !== 401) connection('服务暂不可达', 'waiting'); }); }, 5000);
-setInterval(() => { if (!state.loggedIn || document.hidden) return; if (state.view === 'resources') resources.refresh(); if ($('details-dialog').open) resources.refreshSession(); }, 3000);
+setInterval(() => { if (!state.loggedIn || document.hidden) return; if ($('details-dialog').open) resources.refreshSession(); }, 3000);
 enter().catch((error) => { showLogin(); if (error.status !== 401) $('login-error').textContent = '暂时无法连接服务，请刷新页面重试'; });

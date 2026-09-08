@@ -29,8 +29,12 @@ export class SessionStatus {
   }
 
   fill(group, sid) {
+    const items = this.data[sid] || [];
+    const signature = JSON.stringify(items.map(({ plugin, name, state, label, detail, pane, pid }) => ({ plugin, name, state, label, detail, pane, pid })));
+    if (group.dataset.signature === signature) return;
+    group.dataset.signature = signature;
     group.replaceChildren();
-    for (const item of this.data[sid] || []) {
+    for (const item of items) {
       const badge = document.createElement('span');
       badge.className = 'plugin-badge';
       badge.dataset.plugin = item.plugin;

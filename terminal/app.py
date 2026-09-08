@@ -109,7 +109,7 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
     app.state.sessions = sessions
     app.state.auth = auth
     app.state.monitor = monitor
-    status = Plugins(sessions, plugins, 1.5)
+    status = Plugins(sessions, plugins, 0.25)
     app.state.plugins = status
     public = urlsplit(config.public_url)
     cookie_path = public.path or "/"
