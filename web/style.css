@@ -50,6 +50,12 @@ kbd { font-family: inherit; font-size: 11px; color: #798393; }
 .session-item .session-info { min-width: 0; flex: 1; }
 .session-item strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 550; }
 .session-item small { display: block; margin-top: 5px; font-size: 10px; color: #7d8793; }
+.plugin-badges { display: grid; gap: 4px; margin-top: 7px; }
+.plugin-badge { display: block; width: fit-content; max-width: 100%; padding: 3px 5px; border-radius: 4px; font-size: 10px; line-height: 1.45; color: #a0a9b8; background: #282d37; overflow-wrap: anywhere; }
+.plugin-badge[data-state="working"], .plugin-badge[data-state="starting"] { color: #a7ceff; background: #25364a; }
+.plugin-badge[data-state="waiting_input"], .plugin-badge[data-state="interrupted"] { color: #a8dfb7; background: #253b30; }
+.plugin-badge[data-state="needs_attention"], .plugin-badge[data-state="paused"] { color: #f0cc88; background: #423621; }
+.plugin-badge[data-state="exited"] { color: #88909d; }
 .dot { display: inline-block; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; flex-shrink: 0; }
 .dot.muted { background: #667080; }
 .dot.waiting { background: #e1b769; }

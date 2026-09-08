@@ -58,6 +58,12 @@ cat "${XDG_RUNTIME_DIR:-/tmp/lan-terminal-$(id -u)}/lan-terminal-8766/access-tok
 
 已有会话及其运行程序可以原样保留，新增的分组、标签和置顶信息也由 tmux 持有。集群迁移方式与完整指标口径见 [容器迁移说明](docs/cluster.md)。执行 `uv run python scripts/bundle.py` 可生成带预构建 Web UI 的运行包，方便部署到已有训练容器。
 
+## Codex 状态插件
+
+在终端直接运行 `codex`，侧栏每 2 秒更新“Working · 工作中”“等待输入”“等待确认 / 输入”“已中断”“已暂停”或“已退出”。未选中的会话同样更新。插件只读检查本地进程、生命周期事件与 tmux 标题，不修改 Codex 配置；没有可靠信号时显示“状态未知”。审批和提问无法进一步细分时，统一提示打开终端查看。
+
+默认启用 `codex` 插件，用 `--plugins none` 可以完全关闭采集。插件接口、版本兼容性、SSH / remote 模式限制和扩展方法见 [状态插件说明](docs/plugins.md)。
+
 ## Web UI 操作
 
 | 操作 | 方式 |
@@ -70,7 +76,8 @@ cat "${XDG_RUNTIME_DIR:-/tmp/lan-terminal-$(id -u)}/lan-terminal-8766/access-tok
 | 查看滚动历史 | 鼠标滚轮；tmux 复制模式下按 `Esc` / `q` 返回交互 |
 | 查看、导出完整历史 | 顶部“历史”，保留最近 20,000 行 |
 | 搜索当前浏览器缓冲区 | 顶部“搜索”或 `Ctrl+Shift+F` |
-| 发送浏览器占用的按键 | 顶部“按键”，可发送 Ctrl+W / Ctrl+T / Ctrl+N / Ctrl+L 等 |
+| 发送浏览器占用的按键 | 顶部“按键”，可发送 Ctrl+W / Ctrl+T / Ctrl+N / Ctrl+L / Ctrl+/ 等 |
+| Ctrl+/ | 按键栏按钮或终端内直接按下，发送终端控制字符 `0x1f`；具体行为由当前程序决定 |
 | 调整字号 / 全屏 | 右下角 `−` / `＋`，右上角全屏按钮 |
 
 HTTP 内网页面的剪贴板 API 在部分浏览器中不可用，因此提供了粘贴面板和复制兼容路径。浏览器保留的快捷键不能全部被网页拦截，可通过“按键”工具栏发送。这里提供终端能力，不包括 VS Code 的编辑器、扩展或调试面板。
@@ -147,6 +154,7 @@ Python 集成测试创建实际监听端口和独立 tmux 服务，验证鉴权�
 - `terminal/pty.py`：异步 PTY 读写、终端尺寸和输出背压。
 - `terminal/sessions.py`：tmux 生命周期；名称和初始目录存储在 tmux 会话选项里，无需数据库。
 - `terminal/cgroup.py` / `terminal/monitor.py`：容器资源、GPU、会话进程树和共享采样缓存。
+- `terminal/plugins/` / `web/plugins.js`：可选的会话状态插件、Codex 适配器与侧栏 badge。
 - `scripts/bundle.py`：将明确列出的运行文件和已构建静态资源打包，不复制凭证。
 - `terminal/tmux.conf`：应用专用终端设置、历史和鼠标支持。
 - `web/`：原生 HTML / CSS / JavaScript，xterm.js 及插件由 esbuild 打包到 `static/`。使用时不依赖 CDN。

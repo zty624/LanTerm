@@ -30,12 +30,13 @@ def main() -> None:
             "README.md",
             "AGENTS.md",
             "docs/cluster.md",
+            "docs/plugins.md",
             "terminal/tmux.conf",
             "scripts/bundle.py",
             "web/lantern.svg",
         )
     ]
-    sources.extend(sorted((ROOT / "terminal").glob("*.py")))
+    sources.extend(sorted((ROOT / "terminal").rglob("*.py")))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     requirements = subprocess.run(
         ["uv", "export", "--frozen", "--no-dev", "--no-hashes", "--no-header", "--no-emit-project"],

@@ -49,7 +49,7 @@ async def server():
         config = Config(
             path, path, shutil.which("bash"), secrets.token_urlsafe(24), 8, "lt_test", ""
         )
-        app = create_app(config)
+        app = create_app(config, ["codex"])
         sock = socket.socket()
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]

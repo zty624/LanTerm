@@ -4,12 +4,14 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ResourceView } from './monitor.js';
+import { SessionStatus } from './plugins.js';
 import './style.css';
 
 const $ = (id) => document.getElementById(id);
 const encoder = new TextEncoder();
 const state = { config: null, sessions: [], active: null, term: null, ws: null, fit: null, search: null, retry: null, retries: 0, generation: 0, editing: null, loggedIn: false, refreshing: false, view: 'terminal', batch: false, selected: new Set(), batchIds: [], batchAction: '' };
 const resources = new ResourceView(api, () => state.sessions, select, () => state.loggedIn);
+const plugins = new SessionStatus(api, () => state.loggedIn);
 let toastTimer;
 let fontSize = Math.min(24, Math.max(10, Number(localStorage.getItem('lt-font')) || 14));
 
@@ -17,8 +19,8 @@ class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }
 }
 
-async function api(path, method = 'GET', body) {
-  const response = await fetch(new URL(`api${path}`, location.href), { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+async function api(path, method = 'GET', body, signal) {
+  const response = await fetch(new URL(`api${path}`, location.href), { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal });
   if (!response.ok) {
     const error = await response.json();
     if (response.status === 401 && path !== '/login') showLogin();
@@ -61,6 +63,7 @@ function disconnect() {
 
 function showLogin() {
   state.loggedIn = false;
+  plugins.reset([]);
   disconnect();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('workspace').hidden = true;
@@ -130,7 +133,7 @@ function render() {
     const title = document.createElement('strong'); title.textContent = item.name;
     const detail = document.createElement('small'); detail.textContent = `${item.shell} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
     const dot = document.createElement('span'); dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
-    info.append(title, detail);
+    info.append(title, detail, plugins.render(item.id));
     if (item.tags.length) {
       const tags = document.createElement('span'); tags.className = 'session-tags';
       for (const name of item.tags.slice(0, 3)) { const tag = document.createElement('span'); tag.textContent = name; tags.append(tag); }
@@ -184,6 +187,8 @@ async function enter() {
   state.config = await api('/config');
   state.sessions = await api('/sessions');
   state.loggedIn = true;
+  plugins.reset(state.config.plugins || []);
+  plugins.refresh();
   $('password').value = '';
   $('login-screen').hidden = true;
   $('workspace').hidden = false;
@@ -288,6 +293,10 @@ function connect() {
     $('terminal-size').textContent = `${cols} × ${rows}`;
   });
   term.attachCustomKeyEventHandler((event) => {
+    if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.code === 'Slash') {
+      if (event.type === 'keydown') { event.preventDefault(); sendInput('\x1f'); }
+      return false;
+    }
     if (event.ctrlKey && event.shiftKey && ['KeyC', 'KeyV', 'KeyF', 'KeyK'].includes(event.code)) {
       if (event.type === 'keydown' && event.code === 'KeyC') { event.preventDefault(); copySelection(); }
       return false;
@@ -405,7 +414,7 @@ $('paste-form').addEventListener('submit', (event) => {
 for (const button of document.querySelectorAll('[data-dismiss]')) button.addEventListener('click', () => button.closest('dialog').close());
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => state.term?.focus());
 for (const button of document.querySelectorAll('[data-key]')) button.addEventListener('click', () => {
-  sendInput({ esc: '\x1b', tab: '\t', interrupt: '\x03', suspend: '\x1a', eof: '\x04', word: '\x17', transpose: '\x14', next: '\x0e', clear: '\x0c', up: '\x1b[A', down: '\x1b[B' }[button.dataset.key]);
+  sendInput({ esc: '\x1b', tab: '\t', interrupt: '\x03', suspend: '\x1a', eof: '\x04', word: '\x17', transpose: '\x14', next: '\x0e', clear: '\x0c', slash: '\x1f', up: '\x1b[A', down: '\x1b[B' }[button.dataset.key]);
   state.term?.focus();
 });
 bind('new-session', () => sessionDialog(null));
@@ -448,7 +457,8 @@ document.addEventListener('keydown', (event) => {
 new ResizeObserver(() => requestAnimationFrame(fit)).observe($('terminal'));
 matchMedia('(max-width: 700px)').addEventListener('change', (event) => { document.body.classList.toggle('sidebar-hidden', event.matches); fit(); });
 window.addEventListener('online', () => { if (state.loggedIn && state.ws?.readyState !== WebSocket.OPEN) connect(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && state.loggedIn) refresh().catch(report); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.loggedIn) { refresh().catch(report); plugins.refresh(); } });
+setInterval(() => { if (!document.hidden) plugins.refresh(); }, 2000);
 setInterval(() => { if (state.loggedIn && !document.hidden) refresh().catch((error) => { if (error.status !== 401) connection('服务暂不可达', 'waiting'); }); }, 5000);
 setInterval(() => { if (!state.loggedIn || document.hidden) return; if (state.view === 'resources') resources.refresh(); if ($('details-dialog').open) resources.refreshSession(); }, 3000);
 enter().catch((error) => { showLogin(); if (error.status !== 401) $('login-error').textContent = '暂时无法连接服务，请刷新页面重试'; });

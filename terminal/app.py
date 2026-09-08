@@ -17,6 +17,7 @@ from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from terminal.config import ASSETS, Config, available_shells
 from terminal.monitor import Monitor
+from terminal.plugins.registry import Plugins
 from terminal.proxy import PrefixMiddleware
 from terminal.pty import Terminal
 from terminal.sessions import SessionError, Sessions
@@ -100,7 +101,7 @@ class Auth:
             raise HTTPException(401, "请先登录")
 
 
-def create_app(config: Config) -> FastAPI:
+def create_app(config: Config, plugins: list[str]) -> FastAPI:
     app = FastAPI(title="LanTerm", docs_url=None, redoc_url=None, openapi_url=None)
     sessions = Sessions(config)
     auth = Auth(config)
@@ -108,6 +109,8 @@ def create_app(config: Config) -> FastAPI:
     app.state.sessions = sessions
     app.state.auth = auth
     app.state.monitor = monitor
+    status = Plugins(sessions, plugins, 1.5)
+    app.state.plugins = status
     public = urlsplit(config.public_url)
     cookie_path = public.path or "/"
     app.add_middleware(PrefixMiddleware, prefix=public.path)
@@ -199,7 +202,12 @@ def create_app(config: Config) -> FastAPI:
             "shell": Path(config.shell).name,
             "cwd": str(config.cwd),
             "max_sessions": config.max_sessions,
+            "plugins": status.catalog(),
         }
+
+    @api.get("/plugins/status")
+    async def plugin_status():
+        return await status.get()
 
     @api.get("/sessions")
     async def listing():

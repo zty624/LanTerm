@@ -8,6 +8,7 @@ import uvicorn
 
 from terminal.app import create_app
 from terminal.config import ASSETS, prepare
+from terminal.plugins.registry import PROVIDERS
 
 
 def main() -> None:
@@ -21,7 +22,11 @@ def main() -> None:
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--max-sessions", type=int, default=32)
     parser.add_argument("--public-url", default="", help="反向代理后的完整访问地址，含路径前缀")
+    parser.add_argument("--plugins", default="codex", help="状态插件，逗号分隔；none 关闭全部插件")
     args = parser.parse_args()
+    plugins = [] if args.plugins == "none" else list(dict.fromkeys(args.plugins.split(",")))
+    if any(name not in PROVIDERS for name in plugins):
+        parser.error(f"可用插件：{', '.join(PROVIDERS)}；或使用 none")
     if not 1 <= args.port <= 65535 or not 1 <= args.max_sessions <= 256:
         parser.error("port 必须在 1–65535，max-sessions 必须在 1–256")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -35,7 +40,7 @@ def main() -> None:
         logging.info("访问密码保存在 %s", config.state / "access-token")
     logging.info("退出 Web 服务会保留终端会话；在 Web UI 中关闭会话才会终止对应进程。")
     uvicorn.run(
-        create_app(config),
+        create_app(config, plugins),
         host=args.host,
         port=args.port,
         workers=1,
