@@ -50,7 +50,9 @@ uv pip sync requirements.txt \
   --public-url 'https://平台域名/notebook/.../proxy/8766/'
 ```
 
-浏览器访问该完整地址，并保留末尾 `/`。前端静态资源、API 和 WebSocket 均跟随当前路径前缀；后端兼容代理去掉前缀或保留前缀两种行为。`--public-url` 指定允许的公开 Origin，并将登录 Cookie 限定到该路径，支持 HTTPS 代理转发到容器内部 HTTP。不会盲目信任客户端自报的转发头。
+浏览器访问该完整地址，并保留末尾 `/`。前端静态资源、API 和 WebSocket 均跟随当前路径前缀；后端兼容代理去掉前缀或保留前缀两种行为。`--public-url` 用于路径前缀和登录 Cookie 的 Path / Secure 设置，支持 HTTPS 代理转发到容器内部 HTTP。
+
+登录、API 和 WebSocket 不再检查 Origin 与后端 Host / 协议是否一致，平台代理改写地址不会触发“不允许跨站访问”。访问密码、登录 Cookie、登录有效期和失败次数限制仍然生效；`--public-url` 不再充当来源白名单。
 
 ## 资源口径
 

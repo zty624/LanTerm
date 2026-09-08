@@ -31,7 +31,7 @@ async def command(ws, text: str, marker: bytes) -> bytes:
     return await until(ws, marker)
 
 
-async def test_authentication_and_cross_site_rejection(server):
+async def test_authentication_and_logout(server):
     assert (await server.client.get("/api/sessions")).status_code == 401
     assert (await server.client.post("/api/sessions", json={})).status_code == 401
     assert (await server.client.post("/api/login", json={"password": "wrong"})).status_code == 401
@@ -41,18 +41,6 @@ async def test_authentication_and_cross_site_rejection(server):
     with pytest.raises(InvalidStatus):
         async with connect(url, origin=server.url):
             pytest.fail("Unauthenticated WebSocket was accepted")
-    cookie = f"{server.config.cookie}={server.client.cookies[server.config.cookie]}"
-    with pytest.raises(InvalidStatus):
-        async with connect(
-            url, origin="http://untrusted.example", additional_headers={"Cookie": cookie}
-        ):
-            pytest.fail("Cross-site WebSocket was accepted")
-    response = await server.client.post(
-        "/api/sessions",
-        headers={"Origin": "http://untrusted.example"},
-        json={"name": "blocked", "shell": "bash", "cwd": str(server.config.cwd)},
-    )
-    assert response.status_code == 403
     async with server.websocket(item["id"]) as ws:
         await until(ws, b"\x1b")
         assert (await server.client.post("/api/logout")).status_code == 200

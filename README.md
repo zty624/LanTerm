@@ -32,6 +32,8 @@ cat "${XDG_RUNTIME_DIR:-/tmp/lan-terminal-$(id -u)}/lan-terminal-8766/access-tok
 
 在登录页面输入该密码即可。也可用环境变量 `LAN_TERMINAL_PASSWORD` 设置至少 12 字符的密码；不要把密码写入仓库或启动命令参数。浏览器使用 HttpOnly、SameSite Cookie 登录；密码不会放在 URL 或服务日志中。
 
+平台代理后的浏览器 Origin 与后端地址可以不同；登录、API 和 WebSocket 均通过密码及有效登录 Cookie 验证，不再进行 Origin 来源校验。
+
 ## 终端能力
 
 - 创建多个独立会话，选择 Bash / Zsh 和初始工作目录。
@@ -126,7 +128,7 @@ npm run test:e2e
 
 已有兼容 Chromium 时可使用 `PLAYWRIGHT_EXECUTABLE_PATH=/path/to/chrome npm run test:e2e`。
 
-Python 集成测试创建实际监听端口和独立 tmux 服务，验证鉴权、跨站拦截、TTY、Bash / Zsh 任务控制、窗口尺寸、Unicode、会话独立性、重命名、重连、Vim 编辑保存、退出后重启以及输出流控。浏览器测试验证真实 UI 操作、Vim 内刷新、服务进程重启恢复及桌面 / 手机布局。所有测试只清理自己创建的临时服务和目录。
+Python 集成测试创建实际监听端口和独立 tmux 服务，验证鉴权、代理来源兼容、TTY、Bash / Zsh 任务控制、窗口尺寸、Unicode、会话独立性、重命名、重连、Vim 编辑保存、退出后重启以及输出流控。浏览器测试验证真实 UI 操作、Vim 内刷新、服务进程重启恢复及桌面 / 手机布局。所有测试只清理自己创建的临时服务和目录。
 
 前端代码修改后需要执行 `npm run build`，再刷新浏览器。后端只启动一个 Uvicorn worker；多个 worker 不共享登录状态。依赖锁文件 `uv.lock`、`package-lock.json` 均纳入版本控制。
 
@@ -141,7 +143,7 @@ Python 集成测试创建实际监听端口和独立 tmux 服务，验证鉴权�
                                               └─ Zsh → Codex
 ```
 
-- `terminal/app.py`：HTTP、登录、会话管理 API、同源 WebSocket。
+- `terminal/app.py`：HTTP、登录、会话管理 API、需登录的 WebSocket。
 - `terminal/pty.py`：异步 PTY 读写、终端尺寸和输出背压。
 - `terminal/sessions.py`：tmux 生命周期；名称和初始目录存储在 tmux 会话选项里，无需数据库。
 - `terminal/cgroup.py` / `terminal/monitor.py`：容器资源、GPU、会话进程树和共享采样缓存。

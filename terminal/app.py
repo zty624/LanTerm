@@ -91,26 +91,11 @@ class Auth:
         self.attempts: dict[str, deque] = defaultdict(deque)
         self.sockets: dict[str, set[WebSocket]] = defaultdict(set)
 
-    def origin_ok(self, request: HTTPConnection) -> bool:
-        origin = request.headers.get("origin")
-        if not origin:
-            return request.scope["type"] != "websocket"
-        parsed = urlsplit(origin)
-        if self.config.public_url:
-            expected = urlsplit(self.config.public_url)
-            return parsed.scheme == expected.scheme and parsed.netloc == expected.netloc
-        scheme = "https" if request.url.scheme in ("https", "wss") else "http"
-        return parsed.scheme == scheme and parsed.netloc == request.headers.get("host")
-
     def valid(self, request: HTTPConnection) -> bool:
-        if not self.origin_ok(request):
-            return False
         token = request.cookies.get(self.config.cookie, "")
         return self.tokens.get(token, 0) > time.time()
 
     async def require(self, request: Request) -> None:
-        if not self.origin_ok(request):
-            raise HTTPException(403, "不允许跨站访问")
         if not self.valid(request):
             raise HTTPException(401, "请先登录")
 
@@ -164,8 +149,6 @@ def create_app(config: Config) -> FastAPI:
 
     @app.post("/api/login")
     async def login(body: Login, request: Request, response: Response):
-        if not auth.origin_ok(request):
-            raise HTTPException(403, "不允许跨站访问")
         now = time.time()
         auth.tokens = {token: expiry for token, expiry in auth.tokens.items() if expiry > now}
         for host in list(auth.attempts):
