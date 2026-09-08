@@ -30,6 +30,9 @@ cat "${XDG_RUNTIME_DIR:-/tmp/lan-terminal-$(id -u)}/lan-terminal-8766/access-tok
 
 - 创建多个独立会话，选择 Bash / Zsh 和初始工作目录。
 - 切换、重命名、关闭会话；双击侧栏会话也能重命名。
+- 会话分组、标签、备注、置顶；按名称 / 标签 / 目录搜索，按分组和状态筛选，可按创建时间、最近活动、名称排序。
+- 批量移入分组、置顶和关闭；执行前列出所选会话，关闭需要确认。未选中的会话不受批量操作影响。
+- 复制会话：用相同 Shell、当前目录、分组和标签创建一个独立 Shell。详情面板显示创建时间、活动时间、当前目录及进程树。
 - 真正的 PTY：Tab 补全、方向键、Ctrl+C、Ctrl+Z、Ctrl+D、`jobs` / `fg` / `bg`、管道、重定向、交互提示、ANSI 颜色和全屏 TUI。
 - 按窗口大小调整终端行列数，向应用传播尺寸变化；支持鼠标、中文输入和 Unicode。
 - 页面刷新、网络断线、浏览器关闭时，命令继续运行。重新连接时由 tmux 恢复当前终端画面，包括尚未退出的 Vim。
@@ -38,6 +41,14 @@ cat "${XDG_RUNTIME_DIR:-/tmp/lan-terminal-$(id -u)}/lan-terminal-8766/access-tok
 - 同一会话可以由多个浏览器同时查看和操作。默认最多 32 个会话、每会话 8 个连接；同时操作同一会话会共享输入，最后调整尺寸的浏览器决定会话尺寸。
 
 会话独立指 Shell 进程、当前目录、终端状态和 Shell 环境变量独立。它们使用同一个系统用户的文件、权限、Shell 配置及命令行工具登录状态，登录的内网用户能够看到并操作所有会话。本项目适合可信内网共享，HTTP 本身不加密；它不提供多用户系统权限隔离。
+
+## 资源监控
+
+点击右上角“资源监控”查看 CPU、内存、GPU、磁盘、网络与各 session 的进程资源。查看监控不会断开当前终端。详情面板显示会话进程的 PID、程序名、状态、CPU 和 RSS，不采集命令参数或环境变量。
+
+容器中优先使用 cgroup v1 / v2 的用量和可见父级配额，区分“当前 cgroup”“主机”“文件系统”“网络命名空间”“设备级 GPU”统计范围。未设置或无法读取的指标显示 `—` 或明确说明，不以主机总量冒充容器配额。速率首次采样需要等下一次刷新。
+
+已有会话及其运行程序可以原样保留，新增的分组、标签和置顶信息也由 tmux 持有。集群迁移方式与完整指标口径见 [容器迁移说明](docs/cluster.md)。执行 `uv run python scripts/bundle.py` 可生成带预构建 Web UI 的运行包，方便部署到已有训练容器。
 
 ## Web UI 操作
 
@@ -89,7 +100,7 @@ tmux -S "$state_dir/tmux.sock" list-sessions
 tmux -S "$state_dir/tmux.sock" attach -t 'lt-替换为实际ID'
 ```
 
-第二行的目标请替换为第一行列出的完整会话名（实际格式为 `lt-<ID>`）。这个 tmux 服务不读取你的 `~/.tmux.conf`，不影响默认 tmux 服务。Shell 仍读取自己的登录 / 交互配置；本应用关闭了 tmux 前缀键，以免吞掉 Shell 的 Ctrl+B。
+`attach` 的目标请替换为 `list-sessions` 列出的完整会话名（实际格式为 `lt-<ID>`）。这个 tmux 服务不读取你的 `~/.tmux.conf`，不影响默认 tmux 服务。Shell 仍读取自己的登录 / 交互配置；本应用关闭了 tmux 前缀键，以免吞掉 Shell 的 Ctrl+B。
 
 ## 开发与验证
 
@@ -127,6 +138,8 @@ Python 集成测试创建实际监听端口和独立 tmux 服务，验证鉴权�
 - `terminal/app.py`：HTTP、登录、会话管理 API、同源 WebSocket。
 - `terminal/pty.py`：异步 PTY 读写、终端尺寸和输出背压。
 - `terminal/sessions.py`：tmux 生命周期；名称和初始目录存储在 tmux 会话选项里，无需数据库。
+- `terminal/cgroup.py` / `terminal/monitor.py`：容器资源、GPU、会话进程树和共享采样缓存。
+- `scripts/bundle.py`：将明确列出的运行文件和已构建静态资源打包，不复制凭证。
 - `terminal/tmux.conf`：应用专用终端设置、历史和鼠标支持。
 - `web/`：原生 HTML / CSS / JavaScript，xterm.js 及插件由 esbuild 打包到 `static/`。使用时不依赖 CDN。
 

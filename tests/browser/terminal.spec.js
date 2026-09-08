@@ -10,7 +10,8 @@ import { promisify } from 'node:util';
 const exec = promisify(execFile);
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const test = base.extend({
-  service: async ({}, use) => {
+  prefix: ['', { option: true }],
+  service: async ({ prefix }, use) => {
     const folder = await mkdtemp(join(tmpdir(), 'lt-e2e-'));
     const socket = createServer();
     await new Promise((resolve) => socket.listen(0, '127.0.0.1', resolve));
@@ -20,7 +21,7 @@ const test = base.extend({
     let proc;
     let logs = '';
     const start = async () => {
-      proc = spawn('.venv/bin/python', ['launch.py', '--host', '127.0.0.1', '--port', String(port), '--state-dir', folder, '--cwd', folder, '--shell', 'bash'], {
+      proc = spawn('.venv/bin/python', ['launch.py', '--host', '127.0.0.1', '--port', String(port), '--state-dir', folder, '--cwd', folder, '--shell', 'bash', ...(prefix ? ['--public-url', `http://127.0.0.1:${port}${prefix}/`] : [])], {
         env: { ...process.env, LAN_TERMINAL_PASSWORD: password }, stdio: ['ignore', 'pipe', 'pipe'],
       });
       proc.stdout.on('data', (chunk) => { logs += chunk; });
@@ -41,7 +42,7 @@ const test = base.extend({
     };
     try {
       await start();
-      await use({ url: `http://127.0.0.1:${port}`, password, folder, restart: async () => { await stop(); await start(); } });
+      await use({ url: `http://127.0.0.1:${port}${prefix}`, password, folder, restart: async () => { await stop(); await start(); } });
       expect(logs).not.toContain('Traceback');
     } finally {
       await stop();
@@ -51,6 +52,27 @@ const test = base.extend({
       await rm(folder, { recursive: true, force: true });
     }
   },
+});
+
+test.describe('cluster proxy path', () => {
+  test.use({ prefix: '/notebook/proxy/8766' });
+  test('assets, login cookie, API and terminal work behind a path prefix', async ({ page, service }) => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await login(page, service);
+    await expect(page).toHaveURL(service.url + '/');
+    await page.locator('#new-session').click();
+    await page.getByLabel('会话名称', { exact: true }).fill('Proxied terminal');
+    await page.getByRole('button', { name: '创建会话', exact: true }).click();
+    await expect(page.locator('#connection-status')).toHaveText('已连接');
+    await run(page, "printf 'proxy:%s\\n' working");
+    await expect(page.locator('.xterm-rows')).toContainText('proxy:working');
+    await page.locator('#show-monitor').click();
+    await expect(page.locator('#metric-cards .metric-card')).toHaveCount(6);
+    await page.locator('#logout').click();
+    await expect(page.locator('#login-screen')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
 
 async function login(page, service) {
@@ -137,5 +159,69 @@ test('real terminal UI, Vim, sessions, reconnect, service restart and mobile lay
   await page.locator('#close-session').click();
   await page.getByRole('button', { name: '结束会话', exact: true }).click();
   await expect(page.locator('#active-name')).toHaveText('Second session');
+  expect(errors).toEqual([]);
+});
+
+test('session organization, batch actions and resource dashboard preserve terminals', async ({ page, service }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Training A');
+  await page.getByLabel('分组', { exact: true }).fill('实验');
+  await page.getByLabel('标签', { exact: true }).fill('gpu, train');
+  await page.getByLabel('备注', { exact: true }).fill('检查模型输出');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await run(page, "export LT_MANAGE=keep; printf 'managed:%s\\n' ready");
+  await expect(page.locator('.xterm-rows')).toContainText('managed:ready');
+  await page.locator('#pin-session').click();
+  await expect(page.locator('.session-item[aria-current="true"] .session-icon')).toHaveText('★');
+  const original = (await (await page.request.get(service.url + '/api/sessions')).json())[0];
+  await page.locator('#duplicate-session').click();
+  await expect(page.locator('#active-name')).toHaveText('Training A 副本');
+  await page.getByLabel('搜索会话').fill('gpu');
+  await expect(page.locator('.session-item')).toHaveCount(2);
+  await page.getByLabel('筛选状态').selectOption('pinned');
+  await expect(page.locator('.session-item')).toHaveCount(1);
+  await expect(page.locator('.session-item')).toContainText('Training A');
+  await page.getByLabel('筛选状态').selectOption('all');
+  await page.getByLabel('搜索会话').fill('');
+  await page.locator('#batch-mode').click();
+  await page.getByRole('checkbox', { name: '选择 Training A', exact: true }).check();
+  await page.getByRole('checkbox', { name: '选择 Training A 副本', exact: true }).check();
+  await page.locator('#batch-group').click();
+  await expect(page.locator('#batch-preview li')).toHaveCount(2);
+  await page.getByLabel('目标分组').fill('Run 2026');
+  await page.locator('#batch-submit').click();
+  await page.getByLabel('筛选分组').selectOption('group:Run 2026');
+  await expect(page.locator('.session-item')).toHaveCount(2);
+  await page.locator('#show-monitor').click();
+  await expect(page.locator('#monitor-view')).toBeVisible();
+  await expect(page.locator('#metric-cards .metric-card')).toHaveCount(6);
+  await expect(page.locator('#session-resources tr')).toHaveCount(2);
+  await expect(page.locator('#monitor-scope')).toContainText('cgroup');
+  await page.locator(`#session-resources tr[data-sid="${original.id}"]`).getByRole('button', { name: '进程', exact: true }).click();
+  await expect(page.locator('#details-title')).toHaveText('Training A');
+  await expect(page.locator('#details-note')).toHaveText('检查模型输出');
+  await expect(page.locator('#process-table')).toContainText('bash');
+  await page.getByRole('button', { name: '关闭详情', exact: true }).click();
+  await page.screenshot({ path: '.runtime/monitor-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: '.runtime/monitor-mobile.png' });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator(`[data-session-id="${original.id}"]`).click();
+  await expect(page.locator('#terminal')).toBeVisible();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await run(page, "printf 'still:%s\\n' \"$LT_MANAGE\"");
+  await expect(page.locator('.xterm-rows')).toContainText('still:keep');
+  await page.getByRole('checkbox', { name: '选择 Training A 副本', exact: true }).check();
+  await page.locator('#batch-close').click();
+  await expect(page.locator('#batch-preview li')).toHaveCount(1);
+  await expect(page.locator('#batch-preview')).toContainText('Training A 副本');
+  await page.getByRole('button', { name: '结束所选会话', exact: true }).click();
+  await expect(page.locator('.session-item')).toHaveCount(1);
+  await expect(page.locator('#active-name')).toHaveText('Training A');
   expect(errors).toEqual([]);
 });

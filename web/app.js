@@ -3,11 +3,13 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { ResourceView } from './monitor.js';
 import './style.css';
 
 const $ = (id) => document.getElementById(id);
 const encoder = new TextEncoder();
-const state = { config: null, sessions: [], active: null, term: null, ws: null, fit: null, search: null, retry: null, retries: 0, generation: 0, editing: null, loggedIn: false, refreshing: false };
+const state = { config: null, sessions: [], active: null, term: null, ws: null, fit: null, search: null, retry: null, retries: 0, generation: 0, editing: null, loggedIn: false, refreshing: false, view: 'terminal', batch: false, selected: new Set(), batchIds: [], batchAction: '' };
+const resources = new ResourceView(api, () => state.sessions, select, () => state.loggedIn);
 let toastTimer;
 let fontSize = Math.min(24, Math.max(10, Number(localStorage.getItem('lt-font')) || 14));
 
@@ -16,7 +18,7 @@ class ApiError extends Error {
 }
 
 async function api(path, method = 'GET', body) {
-  const response = await fetch(`/api${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(new URL(`api${path}`, location.href), { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) {
     const error = await response.json();
     if (response.status === 401 && path !== '/login') showLogin();
@@ -64,38 +66,102 @@ function showLogin() {
   $('workspace').hidden = true;
   $('login-screen').hidden = false;
   $('password').focus();
+  resources.data = null;
+}
+
+function filteredSessions() {
+  const query = $('filter-query').value.trim().toLowerCase();
+  const group = $('filter-group').value;
+  const status = $('filter-status').value;
+  const sort = $('session-sort').value;
+  return state.sessions.filter((item) => {
+    if (query && ![item.name, item.group, item.cwd, item.note, ...item.tags].join(' ').toLowerCase().includes(query)) return false;
+    if (group && (group === '@none' ? !!item.group : `group:${item.group}` !== group)) return false;
+    if (status === 'running' && item.status !== 'running') return false;
+    if (status === 'exited' && item.status !== 'exited') return false;
+    if (status === 'attached' && !item.clients) return false;
+    if (status === 'detached' && (item.clients || item.status !== 'running')) return false;
+    if (status === 'pinned' && !item.pinned) return false;
+    return true;
+  }).sort((a, b) => Number(b.pinned) - Number(a.pinned)
+    || (a.pinned ? 0 : a.group.localeCompare(b.group))
+    || (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'activity' ? b.activity - a.activity : b.created - a.created)
+    || a.id.localeCompare(b.id));
+}
+
+function groupOptions() {
+  const names = [...new Set(state.sessions.map((item) => item.group).filter(Boolean))].sort();
+  const key = JSON.stringify(names);
+  if ($('filter-group').dataset.options === key) return;
+  const selected = $('filter-group').value;
+  $('filter-group').replaceChildren(new Option('全部分组', ''), new Option('未分组', '@none'), ...names.map((name) => new Option(name, `group:${name}`)));
+  $('filter-group').value = [...$('filter-group').options].some((option) => option.value === selected) ? selected : '';
+  $('filter-group').dataset.options = key;
+  $('group-options').replaceChildren(...names.map((name) => new Option(name, name)));
 }
 
 function render() {
+  groupOptions();
+  const ids = new Set(state.sessions.map((item) => item.id));
+  state.selected = new Set([...state.selected].filter((id) => ids.has(id)));
+  const visible = filteredSessions();
   const fragment = document.createDocumentFragment();
-  for (const item of state.sessions) {
+  let lastGroup = null;
+  for (const item of visible) {
+    const group = item.pinned ? '★ 置顶' : item.group || '未分组';
+    if (lastGroup !== group) {
+      const heading = document.createElement('div'); heading.className = 'group-heading'; heading.textContent = group;
+      fragment.append(heading); lastGroup = group;
+    }
+    const row = document.createElement('div'); row.className = 'session-row'; row.setAttribute('role', 'listitem');
+    if (state.batch) {
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = state.selected.has(item.id);
+      checkbox.setAttribute('aria-label', `选择 ${item.name}`);
+      checkbox.addEventListener('change', () => { if (checkbox.checked) state.selected.add(item.id); else state.selected.delete(item.id); $('selected-count').textContent = `已选 ${state.selected.size}`; });
+      row.append(checkbox);
+    }
     const button = document.createElement('button');
     button.className = `session-item${state.active === item.id ? ' active' : ''}`;
-    button.setAttribute('role', 'listitem');
     button.setAttribute('aria-current', String(state.active === item.id));
     button.dataset.sessionId = item.id;
-    button.title = `${item.name}\n初始目录: ${item.cwd}\n双击重命名`;
-    const icon = document.createElement('span'); icon.className = 'session-icon'; icon.textContent = '>_';
+    button.title = `${item.name}\n${item.group || '未分组'} · 初始目录: ${item.cwd}\n${item.note || '双击编辑名称、分组和标签'}`;
+    const icon = document.createElement('span'); icon.className = 'session-icon'; icon.textContent = item.pinned ? '★' : '>_';
     const info = document.createElement('span'); info.className = 'session-info';
     const title = document.createElement('strong'); title.textContent = item.name;
     const detail = document.createElement('small'); detail.textContent = `${item.shell} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
     const dot = document.createElement('span'); dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
-    info.append(title, detail); button.append(icon, info, dot);
+    info.append(title, detail);
+    if (item.tags.length) {
+      const tags = document.createElement('span'); tags.className = 'session-tags';
+      for (const name of item.tags.slice(0, 3)) { const tag = document.createElement('span'); tag.textContent = name; tags.append(tag); }
+      info.append(tags);
+    }
+    button.append(icon, info, dot);
     button.addEventListener('click', () => select(item.id));
     button.addEventListener('dblclick', () => sessionDialog(item));
-    fragment.append(button);
+    row.append(button); fragment.append(row);
   }
+  if (!visible.length) { const empty = document.createElement('p'); empty.className = 'monitor-note'; empty.textContent = '没有匹配的会话'; fragment.append(empty); }
   $('session-list').replaceChildren(fragment);
-  $('session-count').textContent = state.sessions.length;
+  $('session-count').textContent = `${visible.length} / ${state.sessions.length}`;
+  $('batch-tools').hidden = !state.batch;
+  $('selected-count').textContent = `已选 ${state.selected.size}`;
+  $('batch-mode').textContent = state.batch ? '退出批量' : '批量管理';
   const item = active();
-  $('active-name').textContent = item?.name || '工作空间';
-  $('active-detail').textContent = item ? `${item.shell}  ·  ${item.cwd}` : '选择或新建一个终端';
+  const monitoring = state.view === 'resources';
+  $('active-name').textContent = monitoring ? '资源监控' : item?.name || '工作空间';
+  $('active-detail').textContent = monitoring ? '容器配额 · GPU · Session 进程' : item ? `${item.shell}  ·  ${item.cwd}` : '选择或新建一个终端';
   $('active-detail').title = item ? `初始目录: ${item.cwd}` : '';
-  $('session-actions').hidden = !item;
+  $('session-actions').hidden = !item || monitoring;
+  $('pin-session').textContent = item?.pinned ? '取消置顶' : '置顶';
   $('restart-session').hidden = item?.status !== 'exited';
-  $('empty-state').hidden = !!item;
-  $('terminal').hidden = !item;
-  document.title = item ? `${item.name} — LAN Terminal` : 'LAN Terminal';
+  $('empty-state').hidden = !!item || monitoring;
+  $('terminal').hidden = !item || monitoring;
+  $('monitor-view').hidden = !monitoring;
+  $('show-monitor').textContent = monitoring ? '返回终端' : '资源监控';
+  document.body.classList.toggle('resources-open', monitoring);
+  if (monitoring) $('search-bar').hidden = true;
+  document.title = monitoring ? '资源监控 — LAN Terminal' : item ? `${item.name} — LAN Terminal` : 'LAN Terminal';
 }
 
 async function refresh() {
@@ -153,7 +219,8 @@ function sendBytes(data) {
 function sendInput(text) { sendBytes(encoder.encode(text)); }
 
 function select(sid) {
-  if (state.active === sid && state.ws) { state.term?.focus(); return; }
+  state.view = 'terminal';
+  if (state.active === sid && state.ws) { render(); fit(); state.term?.focus(); return; }
   disconnect();
   state.active = sid;
   state.retries = 0;
@@ -184,7 +251,7 @@ function connect() {
   }));
   term.open($('terminal')); fit();
   $('font-size').textContent = `${fontSize}px`;
-  const url = new URL(`/ws/${state.active}`, location.href);
+  const url = new URL(`ws/${state.active}`, location.href);
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   url.searchParams.set('cols', Math.min(500, Math.max(10, term.cols)));
   url.searchParams.set('rows', Math.min(200, Math.max(2, term.rows)));
@@ -251,6 +318,9 @@ function sessionDialog(item) {
   $('session-submit').textContent = item ? '保存名称' : '创建会话';
   $('create-options').hidden = !!item;
   $('session-name').value = item?.name || `Terminal ${state.sessions.length + 1}`;
+  $('session-group').value = item?.group || '';
+  $('session-tags').value = item?.tags.join(', ') || '';
+  $('session-note').value = item?.note || '';
   $('session-shell').value = state.config.shell;
   $('session-cwd').value = state.config.cwd;
   $('session-error').textContent = '';
@@ -261,6 +331,33 @@ function showSearch() {
   if (!state.term) return;
   $('search-bar').hidden = false; $('search-input').focus();
 }
+
+function prepareBatch(action) {
+  state.batchIds = [...state.selected];
+  if (!state.batchIds.length) { toast('请先选择会话'); return; }
+  state.batchAction = action;
+  const closing = action === 'close';
+  $('batch-title').textContent = closing ? `关闭 ${state.batchIds.length} 个会话？` : action === 'group' ? '批量移入分组' : '批量置顶';
+  $('batch-description').textContent = closing ? '下面这些会话中的 Shell 和正在运行的程序将结束。' : '操作仅应用于下方列出的会话。';
+  $('batch-preview').replaceChildren(...state.sessions.filter((item) => state.selected.has(item.id)).map((item) => { const li = document.createElement('li'); li.textContent = `${item.name} · ${item.status === 'exited' ? '已退出' : '运行中'}`; return li; }));
+  $('batch-group-field').hidden = action !== 'group';
+  $('batch-group-name').value = '';
+  $('batch-submit').textContent = closing ? '结束所选会话' : '保存';
+  $('batch-submit').className = closing ? 'danger' : 'primary';
+  $('batch-error').textContent = '';
+  $('batch-dialog').showModal();
+}
+
+$('batch-form').addEventListener('submit', async (event) => {
+  event.preventDefault(); event.submitter.disabled = true;
+  try {
+    const result = await api('/sessions/batch', 'POST', { ids: state.batchIds, action: state.batchAction, group: $('batch-group-name').value.trim() });
+    state.selected = new Set(result.failed.map((item) => item.id));
+    $('batch-dialog').close(); await refresh();
+    toast(`完成 ${result.succeeded.length} 个会话${result.failed.length ? `，${result.failed.length} 个失败，请刷新后重试` : ''}`);
+  } catch (error) { $('batch-error').textContent = error.message; }
+  finally { event.submitter.disabled = false; }
+});
 
 $('login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -274,7 +371,7 @@ $('login-form').addEventListener('submit', async (event) => {
 $('session-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const button = event.submitter; button.disabled = true;
-  const body = { name: $('session-name').value.trim() };
+  const body = { name: $('session-name').value.trim(), group: $('session-group').value.trim(), tags: $('session-tags').value.split(/[,，]/).map((value) => value.trim()).filter(Boolean), note: $('session-note').value };
   try {
     let item;
     if (state.editing) item = await api(`/sessions/${state.editing}`, 'PATCH', body);
@@ -314,6 +411,17 @@ for (const button of document.querySelectorAll('[data-key]')) button.addEventLis
 bind('new-session', () => sessionDialog(null));
 bind('first-session', () => sessionDialog(null));
 bind('rename-session', () => sessionDialog(active()));
+bind('pin-session', async () => { const item = active(); if (!item) return; await api(`/sessions/${item.id}`, 'PATCH', { pinned: !item.pinned }); await refresh(); });
+bind('duplicate-session', async () => { const item = await api(`/sessions/${state.active}/duplicate`, 'POST'); state.sessions = await api('/sessions'); select(item.id); toast('已按原会话的当前目录和 Shell 创建新会话'); });
+bind('session-details', () => resources.showSession(state.active));
+bind('batch-mode', () => { state.batch = !state.batch; if (!state.batch) state.selected.clear(); render(); });
+bind('select-visible', () => { for (const item of filteredSessions()) state.selected.add(item.id); render(); });
+bind('clear-selected', () => { state.selected.clear(); render(); });
+bind('batch-group', () => prepareBatch('group'));
+bind('batch-pin', () => prepareBatch('pin'));
+bind('batch-close', () => prepareBatch('close'));
+bind('show-monitor', async () => { state.view = state.view === 'resources' ? 'terminal' : 'resources'; render(); if (state.view === 'resources') await resources.refresh(); else { fit(); state.term?.focus(); } });
+for (const id of ['filter-query', 'filter-group', 'filter-status', 'session-sort']) $(id).addEventListener(id === 'filter-query' ? 'input' : 'change', render);
 bind('close-session', () => { if (!active()) return; $('close-name').textContent = active().name; $('confirm-dialog').dataset.sid = state.active; $('close-error').textContent = ''; $('confirm-dialog').showModal(); });
 bind('restart-session', async () => { await api(`/sessions/${state.active}/restart`, 'POST'); await refresh(); connect(); });
 bind('show-paste', () => { $('paste-text').value = ''; $('paste-dialog').showModal(); $('paste-text').focus(); });
@@ -342,4 +450,5 @@ matchMedia('(max-width: 700px)').addEventListener('change', (event) => { documen
 window.addEventListener('online', () => { if (state.loggedIn && state.ws?.readyState !== WebSocket.OPEN) connect(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && state.loggedIn) refresh().catch(report); });
 setInterval(() => { if (state.loggedIn && !document.hidden) refresh().catch((error) => { if (error.status !== 401) connection('服务暂不可达', 'waiting'); }); }, 5000);
+setInterval(() => { if (!state.loggedIn || document.hidden) return; if (state.view === 'resources') resources.refresh(); if ($('details-dialog').open) resources.refreshSession(); }, 3000);
 enter().catch((error) => { showLogin(); if (error.status !== 401) $('login-error').textContent = '暂时无法连接服务，请刷新页面重试'; });

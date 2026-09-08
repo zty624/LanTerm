@@ -5,7 +5,7 @@ import time
 from collections import defaultdict, deque
 from contextlib import suppress
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, Response, WebSocket
@@ -15,7 +15,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from starlette.requests import HTTPConnection
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
-from terminal.config import ROOT, Config, available_shells
+from terminal.config import ASSETS, Config, available_shells
+from terminal.monitor import Monitor
+from terminal.proxy import PrefixMiddleware
 from terminal.pty import Terminal
 from terminal.sessions import SessionError, Sessions
 
@@ -27,9 +29,13 @@ class Login(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
-class Rename(BaseModel):
+class Metadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name: str = Field(min_length=1, max_length=80)
+    name: str = Field(default="", min_length=1, max_length=80)
+    group: str = Field(default="", max_length=40)
+    tags: list[str] = Field(default_factory=list, max_length=8)
+    pinned: bool = Field(default=False, strict=True)
+    note: str = Field(default="", max_length=500)
 
     @field_validator("name")
     @classmethod
@@ -39,10 +45,43 @@ class Rename(BaseModel):
             raise ValueError("会话名称不能为空或包含控制字符")
         return value
 
+    @field_validator("group")
+    @classmethod
+    def clean_group(cls, value: str) -> str:
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("分组不能包含控制字符")
+        return value.strip()
 
-class Create(Rename):
+    @field_validator("tags")
+    @classmethod
+    def clean_tags(cls, values: list[str]) -> list[str]:
+        tags = list(dict.fromkeys(value.strip() for value in values))
+        if any(not tag or len(tag) > 24 or any(ord(c) < 32 for c in tag) for tag in tags):
+            raise ValueError("标签需要为 1–24 个字符，不含控制字符")
+        return tags
+
+
+class Create(Metadata):
+    name: str = Field(min_length=1, max_length=80)
     shell: str
     cwd: str = Field(min_length=1, max_length=4096)
+
+
+class Batch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ids: list[str] = Field(min_length=1, max_length=256)
+    action: Literal["close", "group", "pin", "unpin"]
+    group: str = Field(default="", max_length=40)
+
+    @field_validator("ids")
+    @classmethod
+    def unique_ids(cls, values: list[str]) -> list[str]:
+        return list(dict.fromkeys(values))
+
+    @field_validator("group")
+    @classmethod
+    def clean_group(cls, value: str) -> str:
+        return Metadata.clean_group(value)
 
 
 class Auth:
@@ -57,6 +96,9 @@ class Auth:
         if not origin:
             return request.scope["type"] != "websocket"
         parsed = urlsplit(origin)
+        if self.config.public_url:
+            expected = urlsplit(self.config.public_url)
+            return parsed.scheme == expected.scheme and parsed.netloc == expected.netloc
         scheme = "https" if request.url.scheme in ("https", "wss") else "http"
         return parsed.scheme == scheme and parsed.netloc == request.headers.get("host")
 
@@ -77,8 +119,13 @@ def create_app(config: Config) -> FastAPI:
     app = FastAPI(title="LAN Terminal", docs_url=None, redoc_url=None, openapi_url=None)
     sessions = Sessions(config)
     auth = Auth(config)
+    monitor = Monitor(config.cwd, Path("/proc"), 3.0)
     app.state.sessions = sessions
     app.state.auth = auth
+    app.state.monitor = monitor
+    public = urlsplit(config.public_url)
+    cookie_path = public.path or "/"
+    app.add_middleware(PrefixMiddleware, prefix=public.path)
 
     @app.middleware("http")
     async def headers(request: Request, call_next):
@@ -109,7 +156,7 @@ def create_app(config: Config) -> FastAPI:
 
     @app.get("/")
     async def index():
-        return FileResponse(ROOT / "static/index.html")
+        return FileResponse(ASSETS / "index.html")
 
     @app.get("/api/health")
     async def health():
@@ -144,7 +191,8 @@ def create_app(config: Config) -> FastAPI:
             httponly=True,
             samesite="strict",
             max_age=TTL,
-            secure=request.url.scheme == "https",
+            secure=public.scheme == "https" or request.url.scheme == "https",
+            path=cookie_path,
         )
         return {"status": "ok"}
 
@@ -158,7 +206,7 @@ def create_app(config: Config) -> FastAPI:
             if ws.application_state == WebSocketState.CONNECTED:
                 with suppress(WebSocketDisconnect):
                     await ws.close(4001, "Logged out")
-        response.delete_cookie(config.cookie)
+        response.delete_cookie(config.cookie, path=cookie_path)
         return {"status": "ok"}
 
     @api.get("/config")
@@ -174,13 +222,33 @@ def create_app(config: Config) -> FastAPI:
     async def listing():
         return await sessions.list()
 
+    @api.get("/metrics")
+    async def metrics():
+        return await monitor.get(await sessions.list())
+
+    @api.post("/sessions/batch")
+    async def batch(body: Batch):
+        return await sessions.batch(body.ids, body.action, body.group)
+
     @api.post("/sessions", status_code=201)
     async def create(body: Create):
-        return await sessions.create(body.name, body.shell, body.cwd)
+        return await sessions.create(
+            body.name, body.shell, body.cwd, body.model_dump(exclude={"name", "shell", "cwd"})
+        )
 
     @api.patch("/sessions/{sid}")
-    async def rename(sid: str, body: Rename):
-        return await sessions.rename(sid, body.name)
+    async def rename(sid: str, body: Metadata):
+        return await sessions.update(sid, body.model_dump(exclude_unset=True))
+
+    @api.post("/sessions/{sid}/duplicate", status_code=201)
+    async def duplicate(sid: str):
+        return await sessions.duplicate(sid)
+
+    @api.get("/sessions/{sid}")
+    async def detail(sid: str):
+        item = await sessions.get(sid)
+        data = await monitor.get(await sessions.list())
+        return {**item, "resources": data["sessions"].get(sid), "sampled_at": data["timestamp"]}
 
     @api.delete("/sessions/{sid}", status_code=204)
     async def close(sid: str):
@@ -226,5 +294,5 @@ def create_app(config: Config) -> FastAPI:
                     await ws.close()
 
     app.include_router(api)
-    app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+    app.mount("/static", StaticFiles(directory=ASSETS), name="static")
     return app

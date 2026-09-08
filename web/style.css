@@ -104,5 +104,62 @@ textarea { font-family: ui-monospace, monospace; resize: vertical; }
 .reconnect-banner button { font-size: 11px; }
 .toast { position: fixed; bottom: 45px; left: 50%; transform: translateX(-50%); background: #303944; border: 1px solid #586878; padding: 12px 20px; border-radius: 7px; box-shadow: 0 4px 30px #0007; font-size: 12px; z-index: 30; max-width: 90vw; }
 .sidebar-hidden #sidebar { display: none; }
+.session-filters { padding: 0 13px 12px; }
+.session-filters input { padding: 8px; font-size: 11px; }
+.filter-row { display: flex; gap: 6px; margin-top: 7px; }
+.filter-row select { min-width: 0; padding: 6px; font-size: 10px; }
+.filter-row button { flex-shrink: 0; font-size: 10px; padding: 6px 8px; }
+.session-row { display: flex; align-items: center; gap: 3px; }
+.session-row > input { width: 14px; flex-shrink: 0; accent-color: var(--accent); }
+.session-item { min-width: 0; }
+.session-item .session-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 5px; }
+.session-tags span { color: #9abca8; background: #303c33; border-radius: 3px; padding: 1px 4px; font-size: 9px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.group-heading { font-size: 10px; color: #849288; padding: 14px 11px 5px; display: flex; justify-content: space-between; }
+.batch-tools { margin: 0 13px 10px; padding: 8px; border: 1px solid #3e5045; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.batch-tools span { font-size: 10px; color: var(--accent); }
+.batch-tools button { font-size: 10px; padding: 4px 6px; }
+.form-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#session-dialog { max-height: 92dvh; }
+#batch-preview { max-height: 180px; overflow: auto; padding-left: 20px; font-size: 12px; line-height: 1.9; }
+.monitor-toggle { font-size: 11px; white-space: nowrap; color: #b2d7c2; border-color: #3a5145; background: #222f28; }
+.toolbar-actions { overflow-x: auto; white-space: nowrap; flex-shrink: 1; }
+.toolbar-actions button { flex-shrink: 0; }
+.monitor-view { flex: 1; min-height: 0; overflow-y: auto; padding: 26px; background: #13171c; }
+.monitor-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.monitor-heading .eyebrow { margin-top: 0; }
+.monitor-heading h2 { margin: 7px 0; font-size: 25px; }
+.monitor-heading p { margin: 0; font-size: 11px; }
+#monitor-updated { font: 10px ui-monospace, monospace; color: #86998b; text-align: right; }
+#monitor-error:empty { min-height: 0; }
+.metric-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+.metric-card { min-width: 0; background: #1c2329; border: 1px solid #303c41; border-radius: 9px; padding: 17px; }
+.metric-label { color: #8fa4a0; font-size: 10px; display: block; }
+.metric-value { display: block; font: 500 26px ui-monospace, monospace; margin: 13px 0 8px; color: #e0eee6; }
+.metric-detail { color: #7f958a; font-size: 10px; line-height: 1.7; margin: 0; overflow-wrap: anywhere; }
+.meter { height: 4px; background: #303e36; border-radius: 3px; overflow: hidden; margin-top: 14px; }
+.meter span { display: block; height: 100%; background: #8fdfb1; transition: width .3s; }
+.meter span.high { background: #e2b576; }
+.sparkline { width: 100%; height: 32px; margin-top: 8px; }
+.sparkline polyline { fill: none; stroke: #78bc9a; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.monitor-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 25px 0 12px; }
+.monitor-section-heading h3 { font-size: 13px; font-weight: 550; margin: 0; color: #bdcfc5; }
+.monitor-section-heading span { font-size: 10px; color: #71867b; }
+.gpu-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 12px; }
+.gpu-cards > p { grid-column: 1 / -1; }
+.table-scroll { overflow-x: auto; border: 1px solid #303a3d; border-radius: 8px; }
+.resource-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; white-space: nowrap; }
+.resource-table th { color: #859b8f; font-weight: 500; background: #1d2625; padding: 11px 12px; }
+.resource-table td { padding: 12px; border-top: 1px solid #293530; color: #b8c9bf; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.resource-table td button { font-size: 10px; padding: 4px 7px; margin-right: 4px; }
+.resource-table tr:hover td { background: #1b2520; }
+.monitor-note { color: #74877b; font-size: 10px; line-height: 1.8; }
+.details-dialog { width: 780px; max-height: 90dvh; }
+.details-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+.details-summary span { display: block; color: #7e9488; font-size: 10px; margin-bottom: 5px; }
+.details-summary strong { font-size: 12px; font-weight: 450; color: #c7dacf; overflow-wrap: anywhere; }
+#details-note { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.resources-open .keybar { display: none; }
+@media (max-width: 1100px) { .metric-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .toolbar { flex-wrap: wrap; height: auto; min-height: 66px; padding-top: 8px; padding-bottom: 8px; } .toolbar-actions { order: 2; width: 100%; justify-content: flex-end; } }
+@media (max-width: 700px) { .monitor-view { padding: 17px 12px; } .metric-cards { grid-template-columns: minmax(0, 1fr); } .monitor-heading { align-items: flex-start; } .monitor-heading h2 { font-size: 20px; } .monitor-section-heading { flex-direction: column; gap: 5px; } .form-columns, .details-summary { grid-template-columns: 1fr; } .toolbar .session-heading { flex-basis: 35%; } .toolbar .toolbar-actions { justify-content: flex-start; } .metric-value { font-size: 24px; } }
 @media (max-width: 1000px) { #sidebar { width: 210px; } .brand { gap: 7px; padding-left: 12px; } .brand strong { font-size: 12px; } .tag { display: none; } .toolbar-actions { gap: 0; } .toolbar-actions button { padding: 6px; } .keyboard-hint { display: none; } }
 @media (max-width: 700px) { #sidebar { position: absolute; inset: 0 auto 0 0; z-index: 10; width: 245px; box-shadow: 15px 0 50px #0008; } .toolbar { gap: 6px; padding: 0 8px; height: auto; min-height: 64px; flex-wrap: wrap; padding-bottom: 6px; } .session-heading { flex-basis: 60%; padding-top: 10px; } .toolbar-actions { order: 2; width: 100%; justify-content: space-between; } #terminal { padding-left: 6px; padding-right: 2px; } .keybar { display: flex; } .statusbar { gap: 10px; } .empty-state h2 { font-size: 21px; } .reconnect-banner { bottom: 85px; max-width: 95%; white-space: normal; } .search-bar { top: 99px; right: 6px; } }

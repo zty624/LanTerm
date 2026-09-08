@@ -3,8 +3,10 @@ import secrets
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parent.parent
+ASSETS = Path(os.getenv("LAN_TERMINAL_STATIC_DIR", str(ROOT / "static"))).resolve()
 
 
 @dataclass(frozen=True)
@@ -15,6 +17,7 @@ class Config:
     password: str
     max_sessions: int
     cookie: str
+    public_url: str
 
     @property
     def socket(self) -> Path:
@@ -25,7 +28,23 @@ def available_shells() -> dict[str, str]:
     return {name: path for name in ("bash", "zsh") if (path := shutil.which(name))}
 
 
-def prepare(state: Path, cwd: Path, shell: str, max_sessions: int, port: int) -> Config:
+def prepare(
+    state: Path, cwd: Path, shell: str, max_sessions: int, port: int, public_url: str
+) -> Config:
+    if public_url:
+        url = urlsplit(public_url)
+        if (
+            url.scheme not in ("http", "https")
+            or not url.netloc
+            or url.username
+            or url.password
+            or url.query
+            or url.fragment
+        ):
+            raise ValueError("public-url 必须为不含凭证、查询参数和片段的完整 HTTP(S) 地址")
+        public_url = urlunsplit(
+            (url.scheme, url.netloc.lower(), url.path.rstrip("/") + "/", "", "")
+        )
     if not shutil.which("tmux"):
         raise ValueError("请先安装 tmux（Arch: sudo pacman -S tmux）")
     shells = available_shells()
@@ -56,4 +75,6 @@ def prepare(state: Path, cwd: Path, shell: str, max_sessions: int, port: int) ->
         path.chmod(0o600)
     if len(password) < 12:
         raise ValueError("访问密码至少需要 12 个字符")
-    return Config(state, cwd, shells[shell], password, max_sessions, f"lan_terminal_{port}")
+    return Config(
+        state, cwd, shells[shell], password, max_sessions, f"lan_terminal_{port}", public_url
+    )

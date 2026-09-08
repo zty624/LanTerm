@@ -46,7 +46,9 @@ class Server:
 async def server():
     with tempfile.TemporaryDirectory(prefix="lt-test-", dir="/tmp") as folder:
         path = Path(folder)
-        config = Config(path, path, shutil.which("bash"), secrets.token_urlsafe(24), 8, "lt_test")
+        config = Config(
+            path, path, shutil.which("bash"), secrets.token_urlsafe(24), 8, "lt_test", ""
+        )
         app = create_app(config)
         sock = socket.socket()
         sock.bind(("127.0.0.1", 0))
