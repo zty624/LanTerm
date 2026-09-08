@@ -10,15 +10,15 @@ npm run build
 uv run python scripts/bundle.py
 ```
 
-生成 `dist/lan-terminal.tar.gz`，内含 Python 服务、锁文件、文档和已构建的 Web UI。打包脚本使用明确的文件列表，不包含运行状态、访问密码、日志、Git、虚拟环境和本机 Shell 配置。源代码的完整开发仓库仍是本地 Git 仓库。
+生成 `dist/LanTerm.tar.gz`，内含 Python 服务、锁文件、文档和已构建的 Web UI。打包脚本使用明确的文件列表，不包含运行状态、访问密码、日志、Git、虚拟环境和本机 Shell 配置。源代码的完整开发仓库仍是本地 Git 仓库。
 
 ## 容器内启动
 
 将包放入已确认的工作目录，解压后执行：
 
 ```bash
-tar -xzf lan-terminal.tar.gz
-cd lan-terminal
+tar -xzf LanTerm.tar.gz
+cd LanTerm
 uv sync --frozen --no-dev
 ./launch.sh --host 0.0.0.0 --port 8766 --shell bash --cwd /已确认的集群工作目录
 ```

@@ -1,4 +1,6 @@
-# LAN Terminal
+# LanTerm
+
+<img src="web/lantern.svg" width="64" height="64" alt="LanTerm 灯笼 Logo" />
 
 在浏览器里使用本机的真实终端。Python 后端通过 WebSocket 和 PTY 接入 tmux，前端使用 xterm.js。支持 Bash / Zsh、Vim、Codex、SSH、htop 等交互式命令行程序。
 
@@ -10,11 +12,15 @@
 # Arch Linux 尚未安装系统依赖时
 sudo pacman -S tmux uv nodejs npm
 
-cd /path/to/lan-terminal
+cd /path/to/LanTerm
 ./launch.sh --host 0.0.0.0 --port 8766 --shell zsh --cwd /path/to/workspace
 ```
 
 首次启动会安装锁定的依赖并构建前端。后续启动直接复用已构建的静态文件。默认监听 `0.0.0.0:8766`；默认工作目录是仓库目录，默认 shell 取自启动环境的 `$SHELL`。
+
+项目名称为 **LanTerm**，Logo 为灯笼。运行状态目录、环境变量与已有服务标识沿用 `lan-terminal` / `LAN_TERMINAL_*`，保证已有 tmux 会话、密码和启动配置继续兼容。
+
+本机仓库目录为 `/mnt/data/Arch/workspace/tools/LanTerm`，旧目录名 `lan-terminal` 保留为兼容软链接，供已经运行的进程和既有命令继续访问。
 
 本机访问 **http://127.0.0.1:8766**，同一内网中的设备访问 **http://服务器内网IP:8766**。`0.0.0.0` 是监听地址；浏览器应填写实际 IP。如果本机防火墙有入站限制，需要允许对应内网访问此 TCP 端口。
 

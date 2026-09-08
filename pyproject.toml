@@ -1,5 +1,5 @@
 [project]
-name = "lan-terminal"
+name = "lanterm"
 version = "0.2.0"
 description = "A real, persistent terminal in your LAN browser"
 requires-python = ">=3.11"

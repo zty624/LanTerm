@@ -147,8 +147,8 @@ test('real terminal UI, Vim, sessions, reconnect, service restart and mobile lay
   await expect(page.locator('#history-content')).toContainText('service-restart:retained');
   await page.getByRole('button', { name: '关闭历史', exact: true }).click();
   await run(page, 'clear');
-  await run(page, "printf '\\033[1;32m%s\\033[0m\\n' 'LAN Terminal — ready'; printf '%s\\n' 'Real Bash / Zsh sessions' 'Vim · Codex · SSH · your everyday tools' 'Sessions survive browser and server reconnects.'; printf '\\n' ");
-  await expect(page.locator('.xterm-rows')).toContainText('LAN Terminal — ready');
+  await run(page, "printf '\\033[1;32m%s\\033[0m\\n' 'LanTerm — ready'; printf '%s\\n' 'Real Bash / Zsh sessions' 'Vim · Codex · SSH · your everyday tools' 'Sessions survive browser and server reconnects.'; printf '\\n' ");
+  await expect(page.locator('.xterm-rows')).toContainText('LanTerm — ready');
   await mkdir('.runtime', { recursive: true });
   await page.screenshot({ path: '.runtime/webui-desktop.png' });
   await page.setViewportSize({ width: 390, height: 844 });

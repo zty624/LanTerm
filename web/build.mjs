@@ -13,3 +13,4 @@ await build({
   legalComments: 'linked',
 });
 await copyFile('web/index.html', `${output}/index.html`);
+await copyFile('web/lantern.svg', `${output}/lantern.svg`);

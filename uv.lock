@@ -132,7 +132,7 @@ wheels = [
 ]
 
 [[package]]
-name = "lan-terminal"
+name = "lanterm"
 version = "0.2.0"
 source = { virtual = "." }
 dependencies = [

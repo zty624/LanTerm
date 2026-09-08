@@ -116,7 +116,7 @@ class Auth:
 
 
 def create_app(config: Config) -> FastAPI:
-    app = FastAPI(title="LAN Terminal", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="LanTerm", docs_url=None, redoc_url=None, openapi_url=None)
     sessions = Sessions(config)
     auth = Auth(config)
     monitor = Monitor(config.cwd, Path("/proc"), 3.0)

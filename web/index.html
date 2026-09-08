@@ -4,17 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#111318" />
-    <title>LAN Terminal</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%23111318'/%3E%3Cpath d='m12 14 10 10-10 10m16 0h9' fill='none' stroke='%238fdfb1' stroke-width='4'/%3E%3C/svg%3E" />
+    <title>LanTerm</title>
+    <link rel="icon" type="image/svg+xml" href="static/lantern.svg" />
     <link rel="stylesheet" href="static/app.css" />
     <script defer src="static/app.js"></script>
   </head>
   <body>
     <section id="login-screen" class="login-screen">
       <form id="login-form" class="login-card">
-        <div class="brand-icon">&gt;_</div>
+        <img class="brand-icon" src="static/lantern.svg" alt="LanTerm 灯笼 Logo" width="64" height="64" />
         <span class="eyebrow">YOUR SHELL, IN YOUR BROWSER</span>
-        <h1>LAN Terminal</h1>
+        <h1>LanTerm</h1>
         <p>连接你的工作环境，接着上次的地方继续。</p>
         <label for="password">访问密码</label>
         <input id="password" type="password" required autocomplete="current-password" autofocus placeholder="输入服务器的访问密码" />
@@ -26,7 +26,7 @@
 
     <main id="workspace" hidden>
       <aside id="sidebar">
-        <div class="brand"><span class="brand-icon small">&gt;_</span><strong>LAN Terminal</strong><span class="tag">LOCAL</span></div>
+        <div class="brand"><img class="brand-icon small" src="static/lantern.svg" alt="灯笼" width="32" height="32" /><strong>LanTerm</strong><span class="tag">LOCAL</span></div>
         <div class="section-label"><span>终端会话</span><span id="session-count">0</span></div>
         <button id="new-session" class="new-session"><span>＋</span> 新建会话 <kbd>⌃ ⇧ K</kbd></button>
         <div class="session-filters">

@@ -1,1 +1,1 @@
-"""LAN Terminal."""
+"""LanTerm."""

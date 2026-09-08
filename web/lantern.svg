@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <title>LanTerm 灯笼</title>
+  <defs>
+    <linearGradient id="paper" x1="13" y1="18" x2="50" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9664"/>
+      <stop offset=".52" stop-color="#F45A45"/>
+      <stop offset="1" stop-color="#B82D3D"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="23" y1="12" x2="42" y2="51" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE4A6"/>
+      <stop offset="1" stop-color="#F0AE58"/>
+    </linearGradient>
+  </defs>
+  <path d="M27 12V9a5 5 0 0 1 10 0v3" stroke="#F6C77B" stroke-width="2.8"/>
+  <path d="M23 16h18c9 2 14 7 14 16S50 46 41 48H23C14 46 9 41 9 32s5-14 14-16Z" fill="url(#paper)"/>
+  <path d="M26 17c-5 8-5 22 0 30M38 17c5 8 5 22 0 30" stroke="#FFCA88" stroke-opacity=".65" stroke-width="2"/>
+  <path d="M32 18v28" stroke="#FFE4AB" stroke-opacity=".7" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M15 25c10-4 24-4 34 0M14 39c11 4 25 4 36 0" stroke="#FFE4AB" stroke-opacity=".25" stroke-width="1.5"/>
+  <rect x="20" y="12" width="24" height="6" rx="3" fill="url(#gold)"/>
+  <rect x="22" y="46" width="20" height="5" rx="2.5" fill="url(#gold)"/>
+  <path d="M32 51v6" stroke="#F8C278" stroke-width="3"/>
+  <path d="m28 61 1-6h6l1 6" stroke="#F47B52" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 56v6" stroke="#FFD993" stroke-width="2.3" stroke-linecap="round"/>
+</svg>

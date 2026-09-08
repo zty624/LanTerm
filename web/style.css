@@ -22,8 +22,8 @@ p { color: #939dad; line-height: 1.8; font-size: 14px; }
 h1, h2 { color: #eff2f6; letter-spacing: -.6px; }
 h2 { font-size: 21px; }
 kbd { font-family: inherit; font-size: 11px; color: #798393; }
-.brand-icon { display: grid; place-items: center; width: 56px; height: 56px; color: var(--accent); border: 1px solid #33503f; background: #1a2b22; border-radius: 14px; font-family: monospace; font-size: 28px; font-weight: bold; }
-.brand-icon.small { width: 30px; height: 30px; border-radius: 7px; font-size: 17px; }
+.brand-icon { display: block; width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
+.brand-icon.small { width: 32px; height: 32px; }
 .login-screen { display: grid; place-items: center; height: 100%; padding: 24px; background: radial-gradient(ellipse at 50% 0%, #20302a 0%, #111318 57%); }
 .login-card { width: 410px; max-width: 100%; padding: 38px; background: #191c23; border: 1px solid #30353d; border-radius: 16px; box-shadow: 0 20px 100px #0005; }
 .login-card h1 { font-size: 30px; margin: 12px 0 0; }

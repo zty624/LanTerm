@@ -161,7 +161,7 @@ function render() {
   $('show-monitor').textContent = monitoring ? '返回终端' : '资源监控';
   document.body.classList.toggle('resources-open', monitoring);
   if (monitoring) $('search-bar').hidden = true;
-  document.title = monitoring ? '资源监控 — LAN Terminal' : item ? `${item.name} — LAN Terminal` : 'LAN Terminal';
+  document.title = monitoring ? '资源监控 — LanTerm' : item ? `${item.name} — LanTerm` : 'LanTerm';
 }
 
 async function refresh() {

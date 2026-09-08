@@ -11,7 +11,7 @@ from terminal.config import ASSETS, prepare
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="LAN Terminal — 真实的多会话 Web 终端")
+    parser = argparse.ArgumentParser(description="LanTerm — 真实的多会话 Web 终端")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument(
