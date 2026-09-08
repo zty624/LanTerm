@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111318" />
+    <title>LAN Terminal</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='12' fill='%23111318'/%3E%3Cpath d='m12 14 10 10-10 10m16 0h9' fill='none' stroke='%238fdfb1' stroke-width='4'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/static/app.css" />
+    <script defer src="/static/app.js"></script>
+  </head>
+  <body>
+    <section id="login-screen" class="login-screen">
+      <form id="login-form" class="login-card">
+        <div class="brand-icon">&gt;_</div>
+        <span class="eyebrow">YOUR SHELL, IN YOUR BROWSER</span>
+        <h1>LAN Terminal</h1>
+        <p>连接你的工作环境，接着上次的地方继续。</p>
+        <label for="password">访问密码</label>
+        <input id="password" type="password" required autocomplete="current-password" autofocus placeholder="输入服务器的访问密码" />
+        <p id="login-error" class="form-error" role="alert"></p>
+        <button type="submit" class="primary">连接终端 <span>↗</span></button>
+        <small>真实 Shell · 独立会话 · 断线保留</small>
+      </form>
+    </section>
+
+    <main id="workspace" hidden>
+      <aside id="sidebar">
+        <div class="brand"><span class="brand-icon small">&gt;_</span><strong>LAN Terminal</strong><span class="tag">LOCAL</span></div>
+        <div class="section-label"><span>终端会话</span><span id="session-count">0</span></div>
+        <button id="new-session" class="new-session"><span>＋</span> 新建会话 <kbd>⌃ ⇧ K</kbd></button>
+        <div id="session-list" role="list" aria-label="终端会话"></div>
+        <div class="sidebar-footer">
+          <span class="dot"></span><span id="host-label"></span>
+          <button id="logout" class="icon-button" title="退出登录，保留终端进程" aria-label="退出登录">↪</button>
+        </div>
+      </aside>
+      <section class="main-panel">
+        <header class="toolbar">
+          <button id="toggle-sidebar" class="icon-button" title="切换侧栏" aria-label="切换侧栏">☰</button>
+          <div class="session-heading"><strong id="active-name">工作空间</strong><span id="active-detail">选择或新建一个终端</span></div>
+          <div class="toolbar-actions" id="session-actions" hidden>
+            <button id="rename-session" title="重命名会话">重命名</button>
+            <button id="show-history" title="查看 tmux 保留的完整历史">历史</button>
+            <button id="show-search" title="搜索当前终端缓冲区 · Ctrl+Shift+F">搜索</button>
+            <button id="show-paste" title="粘贴文本；也可直接使用 Ctrl+Shift+V">粘贴</button>
+            <button id="show-keys" title="发送被浏览器占用的控制键">按键</button>
+            <button id="restart-session" hidden>重新启动</button>
+            <button id="close-session" class="danger-subtle" title="结束此会话及其中的进程">关闭</button>
+          </div>
+          <button id="fullscreen" class="icon-button" title="全屏" aria-label="全屏">⛶</button>
+        </header>
+        <div id="search-bar" class="search-bar" hidden>
+          <input id="search-input" aria-label="搜索终端" placeholder="搜索当前缓冲区…" />
+          <button id="search-prev" aria-label="上一个结果">↑</button><button id="search-next" aria-label="下一个结果">↓</button>
+          <button id="search-close" aria-label="关闭搜索">×</button>
+        </div>
+        <div id="empty-state" class="empty-state">
+          <div class="terminal-art" aria-hidden="true"><span>~/workspace</span><p><b>❯</b> <i></i></p></div>
+          <h2>一个终端，无限可能。</h2>
+          <p>启动 Bash 或 Zsh，运行你熟悉的命令和工具。<br />每个会话独立运行，离开页面也会继续。</p>
+          <button id="first-session" class="primary">＋ 创建第一个会话</button>
+          <div class="tool-chips"><span>bash</span><span>zsh</span><span>vim</span><span>codex</span><span>htop</span></div>
+        </div>
+        <div id="terminal" hidden aria-label="交互终端"></div>
+        <div id="reconnect-banner" class="reconnect-banner" hidden><span id="reconnect-text">连接已断开，正在重新连接…</span><button id="reconnect-now">立即重连</button></div>
+        <footer class="statusbar">
+          <span><span id="connection-dot" class="dot muted"></span><span id="connection-status">准备就绪</span></span>
+          <span id="terminal-size"></span>
+          <span class="keyboard-hint">Shift + 拖选复制 · 滚轮查看历史</span>
+          <div class="zoom"><button id="zoom-out" aria-label="缩小字体">−</button><span id="font-size">14px</span><button id="zoom-in" aria-label="放大字体">＋</button></div>
+        </footer>
+        <nav class="keybar" aria-label="终端快捷键"><button data-key="esc">Esc</button><button data-key="tab">Tab</button><button data-key="interrupt">Ctrl+C</button><button data-key="suspend">Ctrl+Z</button><button data-key="eof">Ctrl+D</button><button data-key="word">Ctrl+W</button><button data-key="transpose">Ctrl+T</button><button data-key="next">Ctrl+N</button><button data-key="clear">Ctrl+L</button><button data-key="up">↑</button><button data-key="down">↓</button></nav>
+      </section>
+    </main>
+
+    <dialog id="session-dialog">
+      <form id="session-form">
+        <div class="dialog-heading"><h2 id="dialog-title">新建会话</h2><button type="button" class="icon-button" data-dismiss aria-label="取消">×</button></div>
+        <label for="session-name">会话名称</label><input id="session-name" maxlength="80" required placeholder="例如：Codex · 项目开发" />
+        <div id="create-options">
+          <label for="session-shell">Shell</label><select id="session-shell"></select>
+          <label for="session-cwd">初始目录</label><input id="session-cwd" required placeholder="/path/to/project" />
+        </div>
+        <p id="session-error" class="form-error" role="alert"></p>
+        <div class="dialog-footer"><button type="button" data-dismiss>取消</button><button id="session-submit" class="primary" type="submit">创建会话</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="confirm-dialog">
+      <form id="confirm-form"><h2>关闭这个会话？</h2><p>「<strong id="close-name"></strong>」中的 Shell 和正在运行的程序将结束。</p><p class="muted-text">如果只是暂时离开，直接关闭浏览器页面即可。</p><p id="close-error" class="form-error" role="alert"></p><div class="dialog-footer"><button type="button" data-dismiss>保留会话</button><button class="danger" type="submit">结束会话</button></div></form>
+    </dialog>
+
+    <dialog id="paste-dialog">
+      <form id="paste-form"><div class="dialog-heading"><h2>粘贴到终端</h2><button type="button" data-dismiss class="icon-button" aria-label="取消">×</button></div><p>在下方粘贴文本，再发送到当前会话。</p><textarea id="paste-text" rows="8" spellcheck="false" aria-label="待粘贴文本"></textarea><div class="dialog-footer"><button type="button" data-dismiss>取消</button><button class="primary" type="submit">发送到终端</button></div></form>
+    </dialog>
+
+    <dialog id="history-dialog" class="history-dialog">
+      <div class="dialog-heading"><h2>会话历史</h2><div><button id="download-history">下载 .txt</button><button data-dismiss class="icon-button" aria-label="关闭历史">×</button></div></div>
+      <p>保留最近 20,000 行。全屏程序的当前画面可在终端中查看。</p><pre id="history-content" tabindex="0"></pre>
+    </dialog>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </body>
+</html>

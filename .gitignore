@@ -1,0 +1,16 @@
+.venv/
+.runtime/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+node_modules/
+static/
+test-results/
+playwright-report/
+*.egg-info/
+dist/
+.env
+.env.*
+!.env.example
+*.log

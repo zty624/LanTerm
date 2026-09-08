@@ -1,0 +1,27 @@
+[project]
+name = "lan-terminal"
+version = "0.1.0"
+description = "A real, persistent terminal in your LAN browser"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "websockets>=14,<17",
+]
+
+[dependency-groups]
+dev = ["httpx>=0.28,<1", "pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.11,<1"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ASYNC110"] # Integration tests poll external processes, not in-process events.
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
