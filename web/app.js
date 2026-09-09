@@ -5,42 +5,91 @@ import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ResourceView } from './monitor.js';
 import { SessionStatus } from './plugins.js';
+import { $, el } from './dom.js';
 import './style.css';
 
-const $ = (id) => document.getElementById(id);
 const encoder = new TextEncoder();
-const state = { config: null, sessions: [], active: null, term: null, ws: null, fit: null, search: null, retry: null, retries: 0, generation: 0, editing: null, loggedIn: false, refreshing: false, view: 'terminal', batch: false, selected: new Set(), batchIds: [], batchAction: '' };
-const resources = new ResourceView(api, () => state.sessions, select, () => state.loggedIn);
+const state = {
+  config: null,
+  sessions: [],
+  active: null,
+  term: null,
+  ws: null,
+  fit: null,
+  search: null,
+  retry: null,
+  retries: 0,
+  generation: 0,
+  editing: null,
+  loggedIn: false,
+  refreshing: false,
+  view: 'terminal',
+  batch: false,
+  selected: new Set(),
+  batchIds: [],
+  batchAction: '',
+};
+const resources = new ResourceView(
+  api,
+  () => state.sessions,
+  select,
+  () => state.loggedIn,
+);
 const plugins = new SessionStatus(api, () => state.loggedIn);
-const sessionView = (items) => items.map(({ activity, ...item }) => ({ ...item, activity: $('session-sort').value === 'activity' ? activity : null }));
+const sessionView = (items) =>
+  items.map(({ activity, ...item }) => ({
+    ...item,
+    activity: $('session-sort').value === 'activity' ? activity : null,
+  }));
 let toastTimer;
 let fontSize = Math.min(28, Math.max(10, Number(localStorage.getItem('lt-font')) || 16));
 
 class ApiError extends Error {
-  constructor(message, status) { super(message); this.status = status; }
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
 }
 
 async function api(path, method = 'GET', body, signal) {
-  const response = await fetch(new URL(`api${path}`, location.href), { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal });
+  const response = await fetch(new URL(`api${path}`, location.href), {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+  });
   if (!response.ok) {
     const error = await response.json();
     if (response.status === 401 && path !== '/login') showLogin();
-    throw new ApiError(typeof error.detail === 'string' ? error.detail : '输入格式有误，请检查后重试', response.status);
+    throw new ApiError(
+      typeof error.detail === 'string' ? error.detail : '输入格式有误，请检查后重试',
+      response.status,
+    );
   }
   if (response.status === 204) return null;
-  return response.headers.get('Content-Type')?.includes('application/json') ? response.json() : response.text();
+  return response.headers.get('Content-Type')?.includes('application/json')
+    ? response.json()
+    : response.text();
 }
 
 function toast(message) {
   $('toast').textContent = message;
   $('toast').hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { $('toast').hidden = true; }, 4000);
+  toastTimer = setTimeout(() => {
+    $('toast').hidden = true;
+  }, 4000);
 }
 
-function report(error) { toast(error.message); }
-function bind(id, action) { $(id).addEventListener('click', () => Promise.resolve().then(action).catch(report)); }
-function active() { return state.sessions.find((item) => item.id === state.active); }
+function report(error) {
+  toast(error.message);
+}
+function bind(id, action) {
+  $(id).addEventListener('click', () => Promise.resolve().then(action).catch(report));
+}
+function active() {
+  return state.sessions.find((item) => item.id === state.active);
+}
 
 function connection(text, status) {
   $('connection-status').textContent = text;
@@ -78,19 +127,36 @@ function filteredSessions() {
   const group = $('filter-group').value;
   const status = $('filter-status').value;
   const sort = $('session-sort').value;
-  return state.sessions.filter((item) => {
-    if (query && ![item.name, item.group, item.cwd, item.note, ...item.tags].join(' ').toLowerCase().includes(query)) return false;
-    if (group && (group === '@none' ? !!item.group : `group:${item.group}` !== group)) return false;
-    if (status === 'running' && item.status !== 'running') return false;
-    if (status === 'exited' && item.status !== 'exited') return false;
-    if (status === 'attached' && !item.clients) return false;
-    if (status === 'detached' && (item.clients || item.status !== 'running')) return false;
-    if (status === 'pinned' && !item.pinned) return false;
-    return true;
-  }).sort((a, b) => Number(b.pinned) - Number(a.pinned)
-    || (a.pinned ? 0 : a.group.localeCompare(b.group))
-    || (sort === 'name' ? a.name.localeCompare(b.name) : sort === 'activity' ? b.activity - a.activity : b.created - a.created)
-    || a.id.localeCompare(b.id));
+  return state.sessions
+    .filter((item) => {
+      if (
+        query &&
+        ![item.name, item.group, item.cwd, item.note, ...item.tags]
+          .join(' ')
+          .toLowerCase()
+          .includes(query)
+      )
+        return false;
+      if (group && (group === '@none' ? !!item.group : `group:${item.group}` !== group))
+        return false;
+      if (status === 'running' && item.status !== 'running') return false;
+      if (status === 'exited' && item.status !== 'exited') return false;
+      if (status === 'attached' && !item.clients) return false;
+      if (status === 'detached' && (item.clients || item.status !== 'running')) return false;
+      if (status === 'pinned' && !item.pinned) return false;
+      return true;
+    })
+    .sort(
+      (a, b) =>
+        Number(b.pinned) - Number(a.pinned) ||
+        (a.pinned ? 0 : a.group.localeCompare(b.group)) ||
+        (sort === 'name'
+          ? a.name.localeCompare(b.name)
+          : sort === 'activity'
+            ? b.activity - a.activity
+            : b.created - a.created) ||
+        a.id.localeCompare(b.id),
+    );
 }
 
 function groupOptions() {
@@ -98,8 +164,16 @@ function groupOptions() {
   const key = JSON.stringify(names);
   if ($('filter-group').dataset.options === key) return;
   const selected = $('filter-group').value;
-  $('filter-group').replaceChildren(new Option('全部分组', ''), new Option('未分组', '@none'), ...names.map((name) => new Option(name, `group:${name}`)));
-  $('filter-group').value = [...$('filter-group').options].some((option) => option.value === selected) ? selected : '';
+  $('filter-group').replaceChildren(
+    new Option('全部分组', ''),
+    new Option('未分组', '@none'),
+    ...names.map((name) => new Option(name, `group:${name}`)),
+  );
+  $('filter-group').value = [...$('filter-group').options].some(
+    (option) => option.value === selected,
+  )
+    ? selected
+    : '';
   $('filter-group').dataset.options = key;
   $('group-options').replaceChildren(...names.map((name) => new Option(name, name)));
 }
@@ -114,14 +188,22 @@ function render() {
   for (const item of visible) {
     const group = item.pinned ? '★ 置顶' : item.group || '未分组';
     if (lastGroup !== group) {
-      const heading = document.createElement('div'); heading.className = 'group-heading'; heading.textContent = group;
-      fragment.append(heading); lastGroup = group;
+      const heading = el('div', 'group-heading', group);
+      fragment.append(heading);
+      lastGroup = group;
     }
-    const row = document.createElement('div'); row.className = 'session-row'; row.setAttribute('role', 'listitem');
+    const row = el('div', 'session-row');
+    row.setAttribute('role', 'listitem');
     if (state.batch) {
-      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = state.selected.has(item.id);
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = state.selected.has(item.id);
       checkbox.setAttribute('aria-label', `选择 ${item.name}`);
-      checkbox.addEventListener('change', () => { if (checkbox.checked) state.selected.add(item.id); else state.selected.delete(item.id); $('selected-count').textContent = `已选 ${state.selected.size}`; });
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) state.selected.add(item.id);
+        else state.selected.delete(item.id);
+        $('selected-count').textContent = `已选 ${state.selected.size}`;
+      });
       row.append(checkbox);
     }
     const button = document.createElement('button');
@@ -129,23 +211,31 @@ function render() {
     button.setAttribute('aria-current', String(state.active === item.id));
     button.dataset.sessionId = item.id;
     button.title = `${item.name}\n${item.group || '未分组'} · 初始目录: ${item.cwd}\n${item.note || '双击编辑名称、分组和标签'}`;
-    const icon = document.createElement('span'); icon.className = 'session-icon'; icon.textContent = item.pinned ? '★' : '>_';
-    const info = document.createElement('span'); info.className = 'session-info';
-    const title = document.createElement('strong'); title.textContent = item.name;
-    const detail = document.createElement('small'); detail.textContent = `${item.shell} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
-    const dot = document.createElement('span'); dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
+    const icon = el('span', 'session-icon', item.pinned ? '★' : '>_');
+    const info = el('span', 'session-info');
+    const title = el('strong', '', item.name);
+    const detail = document.createElement('small');
+    detail.textContent = `${item.shell} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
+    const dot = document.createElement('span');
+    dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
     info.append(title, detail, plugins.render(item.id));
     if (item.tags.length) {
-      const tags = document.createElement('span'); tags.className = 'session-tags';
-      for (const name of item.tags.slice(0, 3)) { const tag = document.createElement('span'); tag.textContent = name; tags.append(tag); }
+      const tags = el('span', 'session-tags');
+      for (const name of item.tags.slice(0, 3)) {
+        tags.append(el('span', '', name));
+      }
       info.append(tags);
     }
     button.append(icon, info, dot);
     button.addEventListener('click', () => select(item.id));
     button.addEventListener('dblclick', () => sessionDialog(item));
-    row.append(button); fragment.append(row);
+    row.append(button);
+    fragment.append(row);
   }
-  if (!visible.length) { const empty = document.createElement('p'); empty.className = 'monitor-note'; empty.textContent = '没有匹配的会话'; fragment.append(empty); }
+  if (!visible.length) {
+    const empty = el('p', 'monitor-note', '没有匹配的会话');
+    fragment.append(empty);
+  }
   $('session-list').replaceChildren(fragment);
   $('session-count').textContent = `${visible.length} / ${state.sessions.length}`;
   $('batch-tools').hidden = !state.batch;
@@ -154,7 +244,11 @@ function render() {
   const item = active();
   const monitoring = state.view === 'resources';
   $('active-name').textContent = monitoring ? '资源监控' : item?.name || '工作空间';
-  $('active-detail').textContent = monitoring ? '容器配额 · GPU · Session 进程' : item ? `${item.shell}  ·  ${item.cwd}` : '选择或新建一个终端';
+  $('active-detail').textContent = monitoring
+    ? '容器配额 · GPU · Session 进程'
+    : item
+      ? `${item.shell}  ·  ${item.cwd}`
+      : '选择或新建一个终端';
   $('active-detail').title = item ? `初始目录: ${item.cwd}` : '';
   $('session-actions').hidden = !item || monitoring;
   $('pin-session').textContent = item?.pinned ? '取消置顶' : '置顶';
@@ -174,17 +268,21 @@ async function refresh() {
   state.refreshing = true;
   try {
     const sessions = await api('/sessions');
-    const changed = JSON.stringify(sessionView(sessions)) !== JSON.stringify(sessionView(state.sessions));
+    const changed =
+      JSON.stringify(sessionView(sessions)) !== JSON.stringify(sessionView(state.sessions));
     state.sessions = sessions;
     if (state.active && !active()) {
-      disconnect(); state.active = null;
+      disconnect();
+      state.active = null;
     }
     if (!state.active && state.sessions.length) {
       select(state.sessions[0].id);
     } else if (changed) {
       render();
     }
-  } finally { state.refreshing = false; }
+  } finally {
+    state.refreshing = false;
+  }
 }
 
 async function enter() {
@@ -197,18 +295,25 @@ async function enter() {
   $('login-screen').hidden = true;
   $('workspace').hidden = false;
   $('host-label').textContent = location.host;
-  $('session-shell').replaceChildren(...state.config.shells.map((shell) => new Option(shell, shell)));
+  $('session-shell').replaceChildren(
+    ...state.config.shells.map((shell) => new Option(shell, shell)),
+  );
   if (matchMedia('(max-width: 700px)').matches) document.body.classList.add('sidebar-hidden');
   const saved = localStorage.getItem('lt-active');
   state.active = null;
-  if (state.sessions.length) select(state.sessions.find((item) => item.id === saved)?.id || state.sessions[0].id);
+  if (state.sessions.length)
+    select(state.sessions.find((item) => item.id === saved)?.id || state.sessions[0].id);
   else render();
 }
 
 function fit() {
   if (!state.fit || !$('terminal').clientHeight) return;
   const size = state.fit.proposeDimensions();
-  if (size) state.term.resize(Math.min(500, Math.max(10, size.cols)), Math.min(200, Math.max(2, size.rows)));
+  if (size)
+    state.term.resize(
+      Math.min(500, Math.max(10, size.cols)),
+      Math.min(200, Math.max(2, size.rows)),
+    );
   if (state.term) $('terminal-size').textContent = `${state.term.cols} × ${state.term.rows}`;
 }
 
@@ -222,14 +327,22 @@ function sendBytes(data) {
     toast('发送缓冲区已满，请等待后再输入或分段粘贴');
     return;
   }
-  for (let offset = 0; offset < data.length; offset += 16384) state.ws.send(data.subarray(offset, offset + 16384));
+  for (let offset = 0; offset < data.length; offset += 16384)
+    state.ws.send(data.subarray(offset, offset + 16384));
 }
 
-function sendInput(text) { sendBytes(encoder.encode(text)); }
+function sendInput(text) {
+  sendBytes(encoder.encode(text));
+}
 
 function select(sid) {
   state.view = 'terminal';
-  if (state.active === sid && state.ws) { render(); fit(); state.term?.focus(); return; }
+  if (state.active === sid && state.ws) {
+    render();
+    fit();
+    state.term?.focus();
+    return;
+  }
   disconnect();
   state.active = sid;
   state.retries = 0;
@@ -244,47 +357,95 @@ function connect() {
   disconnect();
   const generation = state.generation;
   const term = new Terminal({
-    cursorBlink: true, cursorStyle: 'bar', fontSize,
-    fontFamily: '"Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", monospace',
-    lineHeight: 1.15, scrollback: 20000, allowProposedApi: true,
-    theme: { background: '#111318', foreground: '#d4dce5', cursor: '#8fdfb1', selectionBackground: '#455d5777', black: '#20252e', red: '#ee8a91', green: '#99cc99', yellow: '#e6c384', blue: '#88ade6', magenta: '#c3a1df', cyan: '#7dc4ca', white: '#d7dce3', brightBlack: '#758190', brightRed: '#ffabb0', brightGreen: '#b4e6b4', brightYellow: '#f2d8a3', brightBlue: '#adc8f0', brightMagenta: '#dcbeef', brightCyan: '#a6e0e5', brightWhite: '#f2f4f7' },
+    cursorBlink: true,
+    cursorStyle: 'bar',
+    fontSize,
+    fontFamily:
+      '"Cascadia Code", "JetBrains Mono", "Noto Sans Mono", "DejaVu Sans Mono", monospace',
+    lineHeight: 1.15,
+    scrollback: 20000,
+    allowProposedApi: true,
+    theme: {
+      background: '#111318',
+      foreground: '#d4dce5',
+      cursor: '#8fdfb1',
+      selectionBackground: '#455d5777',
+      black: '#20252e',
+      red: '#ee8a91',
+      green: '#99cc99',
+      yellow: '#e6c384',
+      blue: '#88ade6',
+      magenta: '#c3a1df',
+      cyan: '#7dc4ca',
+      white: '#d7dce3',
+      brightBlack: '#758190',
+      brightRed: '#ffabb0',
+      brightGreen: '#b4e6b4',
+      brightYellow: '#f2d8a3',
+      brightBlue: '#adc8f0',
+      brightMagenta: '#dcbeef',
+      brightCyan: '#a6e0e5',
+      brightWhite: '#f2f4f7',
+    },
   });
   state.term = term;
-  const fitAddon = new FitAddon(); state.fit = fitAddon; term.loadAddon(fitAddon);
-  state.search = new SearchAddon(); term.loadAddon(state.search);
-  term.loadAddon(new Unicode11Addon()); term.unicode.activeVersion = '11';
-  term.loadAddon(new WebLinksAddon((event, uri) => {
-    event.preventDefault();
-    const url = new URL(uri);
-    if (['http:', 'https:'].includes(url.protocol)) window.open(url.href, '_blank', 'noopener,noreferrer');
-  }));
-  term.open($('terminal')); fit();
+  const fitAddon = new FitAddon();
+  state.fit = fitAddon;
+  term.loadAddon(fitAddon);
+  state.search = new SearchAddon();
+  term.loadAddon(state.search);
+  term.loadAddon(new Unicode11Addon());
+  term.unicode.activeVersion = '11';
+  term.loadAddon(
+    new WebLinksAddon((event, uri) => {
+      event.preventDefault();
+      const url = new URL(uri);
+      if (['http:', 'https:'].includes(url.protocol))
+        window.open(url.href, '_blank', 'noopener,noreferrer');
+    }),
+  );
+  term.open($('terminal'));
+  fit();
   $('font-size').textContent = `${fontSize}px`;
   const url = new URL(`ws/${state.active}`, location.href);
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   url.searchParams.set('cols', Math.min(500, Math.max(10, term.cols)));
   url.searchParams.set('rows', Math.min(200, Math.max(2, term.rows)));
-  const ws = new WebSocket(url); state.ws = ws; ws.binaryType = 'arraybuffer';
+  const ws = new WebSocket(url);
+  state.ws = ws;
+  ws.binaryType = 'arraybuffer';
   connection('正在连接', 'waiting');
   ws.onopen = () => {
     if (state.generation !== generation) return;
-    state.retries = 0; $('reconnect-banner').hidden = true;
-    connection('已连接', ''); term.options.disableStdin = false;
-    fit(); term.focus();
+    state.retries = 0;
+    $('reconnect-banner').hidden = true;
+    connection('已连接', '');
+    term.options.disableStdin = false;
+    fit();
+    term.focus();
   };
   ws.onmessage = (event) => {
     if (state.generation !== generation) return;
     const data = new Uint8Array(event.data);
     term.write(data, () => {
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ack', size: data.byteLength }));
+      if (ws.readyState === WebSocket.OPEN)
+        ws.send(JSON.stringify({ type: 'ack', size: data.byteLength }));
     });
   };
   ws.onclose = async (event) => {
     if (state.generation !== generation || !state.loggedIn) return;
-    connection('连接断开', 'waiting'); term.options.disableStdin = true;
-    if (event.code === 4001) { showLogin(); return; }
+    connection('连接断开', 'waiting');
+    term.options.disableStdin = true;
+    if (event.code === 4001) {
+      showLogin();
+      return;
+    }
     $('reconnect-banner').hidden = false;
-    try { await refresh(); } catch (error) { if (error.status === 401) return; }
+    try {
+      await refresh();
+    } catch (error) {
+      if (error.status === 401) return;
+    }
     if (state.generation !== generation || !active()) return;
     const delay = Math.min(1000 * 2 ** state.retries++, 10000);
     $('reconnect-text').textContent = `连接已断开，${delay / 1000} 秒后重连…`;
@@ -293,16 +454,32 @@ function connect() {
   term.onData(sendInput);
   term.onBinary((data) => sendBytes(Uint8Array.from(data, (char) => char.charCodeAt(0))));
   term.onResize(({ cols, rows }) => {
-    sendControl({ type: 'resize', cols: Math.min(500, Math.max(10, cols)), rows: Math.min(200, Math.max(2, rows)) });
+    sendControl({
+      type: 'resize',
+      cols: Math.min(500, Math.max(10, cols)),
+      rows: Math.min(200, Math.max(2, rows)),
+    });
     $('terminal-size').textContent = `${cols} × ${rows}`;
   });
   term.attachCustomKeyEventHandler((event) => {
-    if (event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && event.code === 'Slash') {
-      if (event.type === 'keydown') { event.preventDefault(); sendInput('\x1f'); }
+    if (
+      event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      event.code === 'Slash'
+    ) {
+      if (event.type === 'keydown') {
+        event.preventDefault();
+        sendInput('\x1f');
+      }
       return false;
     }
     if (event.ctrlKey && event.shiftKey && ['KeyC', 'KeyV', 'KeyF', 'KeyK'].includes(event.code)) {
-      if (event.type === 'keydown' && event.code === 'KeyC') { event.preventDefault(); copySelection(); }
+      if (event.type === 'keydown' && event.code === 'KeyC') {
+        event.preventDefault();
+        copySelection();
+      }
       return false;
     }
     return true;
@@ -318,10 +495,15 @@ function copySelection() {
 }
 
 function fallbackCopy(text) {
-  const field = document.createElement('textarea'); field.value = text;
-  field.style.position = 'fixed'; field.style.left = '-10000px';
-  document.body.append(field); field.select();
-  const ok = document.execCommand('copy'); field.remove(); state.term?.focus();
+  const field = document.createElement('textarea');
+  field.value = text;
+  field.style.position = 'fixed';
+  field.style.left = '-10000px';
+  document.body.append(field);
+  field.select();
+  const ok = document.execCommand('copy');
+  field.remove();
+  state.term?.focus();
   toast(ok ? '已复制' : '请使用浏览器的复制菜单');
 }
 
@@ -337,22 +519,42 @@ function sessionDialog(item) {
   $('session-shell').value = state.config.shell;
   $('session-cwd').value = state.config.cwd;
   $('session-error').textContent = '';
-  $('session-dialog').showModal(); $('session-name').focus(); $('session-name').select();
+  $('session-dialog').showModal();
+  $('session-name').focus();
+  $('session-name').select();
 }
 
 function showSearch() {
   if (!state.term) return;
-  $('search-bar').hidden = false; $('search-input').focus();
+  $('search-bar').hidden = false;
+  $('search-input').focus();
 }
 
 function prepareBatch(action) {
   state.batchIds = [...state.selected];
-  if (!state.batchIds.length) { toast('请先选择会话'); return; }
+  if (!state.batchIds.length) {
+    toast('请先选择会话');
+    return;
+  }
   state.batchAction = action;
   const closing = action === 'close';
-  $('batch-title').textContent = closing ? `关闭 ${state.batchIds.length} 个会话？` : action === 'group' ? '批量移入分组' : '批量置顶';
-  $('batch-description').textContent = closing ? '下面这些会话中的 Shell 和正在运行的程序将结束。' : '操作仅应用于下方列出的会话。';
-  $('batch-preview').replaceChildren(...state.sessions.filter((item) => state.selected.has(item.id)).map((item) => { const li = document.createElement('li'); li.textContent = `${item.name} · ${item.status === 'exited' ? '已退出' : '运行中'}`; return li; }));
+  $('batch-title').textContent = closing
+    ? `关闭 ${state.batchIds.length} 个会话？`
+    : action === 'group'
+      ? '批量移入分组'
+      : '批量置顶';
+  $('batch-description').textContent = closing
+    ? '下面这些会话中的 Shell 和正在运行的程序将结束。'
+    : '操作仅应用于下方列出的会话。';
+  $('batch-preview').replaceChildren(
+    ...state.sessions
+      .filter((item) => state.selected.has(item.id))
+      .map((item) => {
+        const li = document.createElement('li');
+        li.textContent = `${item.name} · ${item.status === 'exited' ? '已退出' : '运行中'}`;
+        return li;
+      }),
+  );
   $('batch-group-field').hidden = action !== 'group';
   $('batch-group-name').value = '';
   $('batch-submit').textContent = closing ? '结束所选会话' : '保存';
@@ -362,38 +564,73 @@ function prepareBatch(action) {
 }
 
 $('batch-form').addEventListener('submit', async (event) => {
-  event.preventDefault(); event.submitter.disabled = true;
+  event.preventDefault();
+  event.submitter.disabled = true;
   try {
-    const result = await api('/sessions/batch', 'POST', { ids: state.batchIds, action: state.batchAction, group: $('batch-group-name').value.trim() });
+    const result = await api('/sessions/batch', 'POST', {
+      ids: state.batchIds,
+      action: state.batchAction,
+      group: $('batch-group-name').value.trim(),
+    });
     state.selected = new Set(result.failed.map((item) => item.id));
-    $('batch-dialog').close(); await refresh();
-    toast(`完成 ${result.succeeded.length} 个会话${result.failed.length ? `，${result.failed.length} 个失败，请刷新后重试` : ''}`);
-  } catch (error) { $('batch-error').textContent = error.message; }
-  finally { event.submitter.disabled = false; }
+    $('batch-dialog').close();
+    await refresh();
+    toast(
+      `完成 ${result.succeeded.length} 个会话${result.failed.length ? `，${result.failed.length} 个失败，请刷新后重试` : ''}`,
+    );
+  } catch (error) {
+    $('batch-error').textContent = error.message;
+  } finally {
+    event.submitter.disabled = false;
+  }
 });
 
 $('login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const button = event.submitter; button.disabled = true;
+  const button = event.submitter;
+  button.disabled = true;
   $('login-error').textContent = '';
-  try { await api('/login', 'POST', { password: $('password').value }); await enter(); }
-  catch (error) { $('login-error').textContent = error.message; }
-  finally { button.disabled = false; }
+  try {
+    await api('/login', 'POST', { password: $('password').value });
+    await enter();
+  } catch (error) {
+    $('login-error').textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
 });
 
 $('session-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const button = event.submitter; button.disabled = true;
-  const body = { name: $('session-name').value.trim(), group: $('session-group').value.trim(), tags: $('session-tags').value.split(/[,，]/).map((value) => value.trim()).filter(Boolean), note: $('session-note').value };
+  const button = event.submitter;
+  button.disabled = true;
+  const body = {
+    name: $('session-name').value.trim(),
+    group: $('session-group').value.trim(),
+    tags: $('session-tags')
+      .value.split(/[,，]/)
+      .map((value) => value.trim())
+      .filter(Boolean),
+    note: $('session-note').value,
+  };
   try {
     let item;
     if (state.editing) item = await api(`/sessions/${state.editing}`, 'PATCH', body);
-    else item = await api('/sessions', 'POST', { ...body, shell: $('session-shell').value, cwd: $('session-cwd').value });
+    else
+      item = await api('/sessions', 'POST', {
+        ...body,
+        shell: $('session-shell').value,
+        cwd: $('session-cwd').value,
+      });
     $('session-dialog').close();
     state.sessions = await api('/sessions');
-    select(item.id); render();
-  } catch (error) { if ($('session-dialog').open) $('session-error').textContent = error.message; else report(error); }
-  finally { button.disabled = false; }
+    select(item.id);
+  } catch (error) {
+    if ($('session-dialog').open) $('session-error').textContent = error.message;
+    else report(error);
+  } finally {
+    button.disabled = false;
+  }
 });
 
 $('confirm-form').addEventListener('submit', async (event) => {
@@ -403,67 +640,214 @@ $('confirm-form').addEventListener('submit', async (event) => {
   try {
     await api(`/sessions/${sid}`, 'DELETE');
     $('confirm-dialog').close();
-    if (state.active === sid) { disconnect(); state.active = null; }
+    if (state.active === sid) {
+      disconnect();
+      state.active = null;
+    }
     await refresh();
-    if (!state.active) { connection('准备就绪', 'muted'); $('terminal-size').textContent = ''; }
-  } catch (error) { $('close-error').textContent = error.message; }
-  finally { event.submitter.disabled = false; }
+    if (!state.active) {
+      connection('准备就绪', 'muted');
+      $('terminal-size').textContent = '';
+    }
+  } catch (error) {
+    $('close-error').textContent = error.message;
+  } finally {
+    event.submitter.disabled = false;
+  }
 });
 
 $('paste-form').addEventListener('submit', (event) => {
-  event.preventDefault(); state.term?.paste($('paste-text').value);
-  $('paste-dialog').close(); state.term?.focus();
-});
-
-for (const button of document.querySelectorAll('[data-dismiss]')) button.addEventListener('click', () => button.closest('dialog').close());
-for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', () => state.term?.focus());
-for (const button of document.querySelectorAll('[data-key]')) button.addEventListener('click', () => {
-  sendInput({ esc: '\x1b', tab: '\t', interrupt: '\x03', suspend: '\x1a', eof: '\x04', word: '\x17', transpose: '\x14', next: '\x0e', clear: '\x0c', slash: '\x1f', up: '\x1b[A', down: '\x1b[B' }[button.dataset.key]);
+  event.preventDefault();
+  state.term?.paste($('paste-text').value);
+  $('paste-dialog').close();
   state.term?.focus();
 });
+
+for (const button of document.querySelectorAll('[data-dismiss]'))
+  button.addEventListener('click', () => button.closest('dialog').close());
+for (const dialog of document.querySelectorAll('dialog'))
+  dialog.addEventListener('close', () => state.term?.focus());
+for (const button of document.querySelectorAll('[data-key]'))
+  button.addEventListener('click', () => {
+    sendInput(
+      {
+        esc: '\x1b',
+        tab: '\t',
+        interrupt: '\x03',
+        suspend: '\x1a',
+        eof: '\x04',
+        word: '\x17',
+        transpose: '\x14',
+        next: '\x0e',
+        clear: '\x0c',
+        slash: '\x1f',
+        up: '\x1b[A',
+        down: '\x1b[B',
+      }[button.dataset.key],
+    );
+    state.term?.focus();
+  });
 bind('new-session', () => sessionDialog(null));
 bind('first-session', () => sessionDialog(null));
 bind('rename-session', () => sessionDialog(active()));
-bind('pin-session', async () => { const item = active(); if (!item) return; await api(`/sessions/${item.id}`, 'PATCH', { pinned: !item.pinned }); await refresh(); });
-bind('duplicate-session', async () => { const item = await api(`/sessions/${state.active}/duplicate`, 'POST'); state.sessions = await api('/sessions'); select(item.id); toast('已按原会话的当前目录和 Shell 创建新会话'); });
+bind('pin-session', async () => {
+  const item = active();
+  if (!item) return;
+  await api(`/sessions/${item.id}`, 'PATCH', { pinned: !item.pinned });
+  await refresh();
+});
+bind('duplicate-session', async () => {
+  const item = await api(`/sessions/${state.active}/duplicate`, 'POST');
+  state.sessions = await api('/sessions');
+  select(item.id);
+  toast('已按原会话的当前目录和 Shell 创建新会话');
+});
 bind('session-details', () => resources.showSession(state.active));
-bind('batch-mode', () => { state.batch = !state.batch; if (!state.batch) state.selected.clear(); render(); });
-bind('select-visible', () => { for (const item of filteredSessions()) state.selected.add(item.id); render(); });
-bind('clear-selected', () => { state.selected.clear(); render(); });
+bind('batch-mode', () => {
+  state.batch = !state.batch;
+  if (!state.batch) state.selected.clear();
+  render();
+});
+bind('select-visible', () => {
+  for (const item of filteredSessions()) state.selected.add(item.id);
+  render();
+});
+bind('clear-selected', () => {
+  state.selected.clear();
+  render();
+});
 bind('batch-group', () => prepareBatch('group'));
 bind('batch-pin', () => prepareBatch('pin'));
 bind('batch-close', () => prepareBatch('close'));
-bind('show-monitor', () => { state.view = state.view === 'resources' ? 'terminal' : 'resources'; render(); if (state.view === 'terminal') { fit(); state.term?.focus(); } });
+bind('show-monitor', () => {
+  state.view = state.view === 'resources' ? 'terminal' : 'resources';
+  render();
+  if (state.view === 'terminal') {
+    fit();
+    state.term?.focus();
+  }
+});
 bind('monitor-refresh', () => resources.refresh());
-for (const id of ['filter-query', 'filter-group', 'filter-status', 'session-sort']) $(id).addEventListener(id === 'filter-query' ? 'input' : 'change', render);
-bind('close-session', () => { if (!active()) return; $('close-name').textContent = active().name; $('confirm-dialog').dataset.sid = state.active; $('close-error').textContent = ''; $('confirm-dialog').showModal(); });
-bind('restart-session', async () => { await api(`/sessions/${state.active}/restart`, 'POST'); await refresh(); connect(); });
-bind('show-paste', () => { $('paste-text').value = ''; $('paste-dialog').showModal(); $('paste-text').focus(); });
-bind('show-keys', () => { document.body.classList.toggle('keys-visible'); fit(); });
-bind('show-history', async () => { const text = await api(`/sessions/${state.active}/history`); $('history-content').textContent = text; $('history-dialog').showModal(); $('history-content').scrollTop = $('history-content').scrollHeight; });
-bind('download-history', () => { const url = URL.createObjectURL(new Blob([$('history-content').textContent], { type: 'text/plain;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = `terminal-${state.active}.txt`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
-bind('logout', async () => { await api('/logout', 'POST'); showLogin(); });
-bind('toggle-sidebar', () => { document.body.classList.toggle('sidebar-hidden'); fit(); });
-bind('fullscreen', async () => { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); fit(); });
+for (const id of ['filter-query', 'filter-group', 'filter-status', 'session-sort'])
+  $(id).addEventListener(id === 'filter-query' ? 'input' : 'change', render);
+bind('close-session', () => {
+  if (!active()) return;
+  $('close-name').textContent = active().name;
+  $('confirm-dialog').dataset.sid = state.active;
+  $('close-error').textContent = '';
+  $('confirm-dialog').showModal();
+});
+bind('restart-session', async () => {
+  await api(`/sessions/${state.active}/restart`, 'POST');
+  await refresh();
+  connect();
+});
+bind('show-paste', () => {
+  $('paste-text').value = '';
+  $('paste-dialog').showModal();
+  $('paste-text').focus();
+});
+bind('show-keys', () => {
+  document.body.classList.toggle('keys-visible');
+  fit();
+});
+bind('show-history', async () => {
+  const text = await api(`/sessions/${state.active}/history`);
+  $('history-content').textContent = text;
+  $('history-dialog').showModal();
+  $('history-content').scrollTop = $('history-content').scrollHeight;
+});
+bind('download-history', () => {
+  const url = URL.createObjectURL(
+    new Blob([$('history-content').textContent], { type: 'text/plain;charset=utf-8' }),
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `terminal-${state.active}.txt`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+bind('logout', async () => {
+  await api('/logout', 'POST');
+  showLogin();
+});
+bind('toggle-sidebar', () => {
+  document.body.classList.toggle('sidebar-hidden');
+  fit();
+});
+bind('fullscreen', async () => {
+  if (document.fullscreenElement) await document.exitFullscreen();
+  else await document.documentElement.requestFullscreen();
+  fit();
+});
 bind('reconnect-now', connect);
 bind('show-search', showSearch);
-bind('search-close', () => { $('search-bar').hidden = true; state.search?.clearDecorations(); state.term?.focus(); });
+bind('search-close', () => {
+  $('search-bar').hidden = true;
+  state.search?.clearDecorations();
+  state.term?.focus();
+});
 bind('search-next', () => state.search?.findNext($('search-input').value));
 bind('search-prev', () => state.search?.findPrevious($('search-input').value));
-$('search-input').addEventListener('input', () => state.search?.findNext($('search-input').value, { incremental: true }));
-$('search-input').addEventListener('keydown', (event) => { if (event.key === 'Enter') state.search?.[event.shiftKey ? 'findPrevious' : 'findNext']($('search-input').value); if (event.key === 'Escape') $('search-close').click(); });
-function zoom(delta) { fontSize = Math.min(28, Math.max(10, fontSize + delta)); localStorage.setItem('lt-font', fontSize); $('font-size').textContent = `${fontSize}px`; if (state.term) { state.term.options.fontSize = fontSize; fit(); } }
-bind('zoom-out', () => zoom(-1)); bind('zoom-in', () => zoom(1));
+$('search-input').addEventListener('input', () =>
+  state.search?.findNext($('search-input').value, { incremental: true }),
+);
+$('search-input').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter')
+    state.search?.[event.shiftKey ? 'findPrevious' : 'findNext']($('search-input').value);
+  if (event.key === 'Escape') $('search-close').click();
+});
+function zoom(delta) {
+  fontSize = Math.min(28, Math.max(10, fontSize + delta));
+  localStorage.setItem('lt-font', fontSize);
+  $('font-size').textContent = `${fontSize}px`;
+  if (state.term) {
+    state.term.options.fontSize = fontSize;
+    fit();
+  }
+}
+bind('zoom-out', () => zoom(-1));
+bind('zoom-in', () => zoom(1));
 document.addEventListener('keydown', (event) => {
   if (!state.loggedIn || document.querySelector('dialog[open]')) return;
-  if (event.ctrlKey && event.shiftKey && event.code === 'KeyK') { event.preventDefault(); sessionDialog(null); }
-  if (event.ctrlKey && event.shiftKey && event.code === 'KeyF') { event.preventDefault(); showSearch(); }
+  if (event.ctrlKey && event.shiftKey && event.code === 'KeyK') {
+    event.preventDefault();
+    sessionDialog(null);
+  }
+  if (event.ctrlKey && event.shiftKey && event.code === 'KeyF') {
+    event.preventDefault();
+    showSearch();
+  }
 });
 new ResizeObserver(() => requestAnimationFrame(fit)).observe($('terminal'));
-matchMedia('(max-width: 700px)').addEventListener('change', (event) => { document.body.classList.toggle('sidebar-hidden', event.matches); fit(); });
-window.addEventListener('online', () => { if (state.loggedIn && state.ws?.readyState !== WebSocket.OPEN) connect(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && state.loggedIn) { refresh().catch(report); plugins.refresh(); resources.resume(); } });
-setInterval(() => { if (!document.hidden) plugins.refresh(); }, 500);
-setInterval(() => { if (state.loggedIn && !document.hidden) refresh().catch((error) => { if (error.status !== 401) connection('服务暂不可达', 'waiting'); }); }, 5000);
-setInterval(() => { if (!state.loggedIn || document.hidden) return; if ($('details-dialog').open) resources.refreshSession(); }, 3000);
-enter().catch((error) => { showLogin(); if (error.status !== 401) $('login-error').textContent = '暂时无法连接服务，请刷新页面重试'; });
+matchMedia('(max-width: 700px)').addEventListener('change', (event) => {
+  document.body.classList.toggle('sidebar-hidden', event.matches);
+  fit();
+});
+window.addEventListener('online', () => {
+  if (state.loggedIn && state.ws?.readyState !== WebSocket.OPEN) connect();
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.loggedIn) {
+    refresh().catch(report);
+    plugins.refresh();
+    resources.resume();
+  }
+});
+setInterval(() => {
+  if (!document.hidden) plugins.refresh();
+}, 500);
+setInterval(() => {
+  if (state.loggedIn && !document.hidden)
+    refresh().catch((error) => {
+      if (error.status !== 401) connection('服务暂不可达', 'waiting');
+    });
+}, 5000);
+setInterval(() => {
+  if (!state.loggedIn || document.hidden) return;
+  if ($('details-dialog').open) resources.refreshSession();
+}, 3000);
+enter().catch((error) => {
+  showLogin();
+  if (error.status !== 401) $('login-error').textContent = '暂时无法连接服务，请刷新页面重试';
+});

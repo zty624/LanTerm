@@ -9,4 +9,4 @@
 - 测试使用真实 shell 和端到端行为，避免无意义的格式断言或哈希断言。
 - 不提交 `.runtime/`、凭证、日志、缓存、依赖目录和构建产物。
 - 使用本地 `feat/*`、`fix/*` 分支开发，验证后合入 `main`，保持主分支可运行。
-- 相关验证：`uv run ruff check .`、`uv run ruff format --check .`、`uv run pytest -q`、`npm run build`、`npm run test:e2e`。
+- 相关验证：`uv run ruff check .`、`uv run ruff format --check .`、`uv run pytest -q`、`npm run format:check`、`npm run build`、`npm run test:e2e`。

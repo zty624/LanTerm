@@ -31,6 +31,7 @@ def main() -> None:
             "AGENTS.md",
             "docs/cluster.md",
             "docs/plugins.md",
+            "docs/usage.md",
             "terminal/tmux.conf",
             "scripts/bundle.py",
             "web/lantern.svg",

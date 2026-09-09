@@ -7,7 +7,9 @@ export default defineConfig({
   workers: 1,
   use: {
     viewport: { width: 1440, height: 900 },
-    launchOptions: process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {},
+    launchOptions: process.env.PLAYWRIGHT_EXECUTABLE_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
+      : {},
     screenshot: 'only-on-failure',
   },
 });

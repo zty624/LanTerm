@@ -1,3 +1,5 @@
+import { el } from './dom.js';
+
 // Generic session badges: providers own their state names and labels on the server.
 export class SessionStatus {
   constructor(api, loggedIn) {
@@ -21,8 +23,7 @@ export class SessionStatus {
   }
 
   render(sid) {
-    const group = document.createElement('span');
-    group.className = 'plugin-badges';
+    const group = el('span', 'plugin-badges');
     group.dataset.pluginSession = sid;
     this.fill(group, sid);
     return group;
@@ -30,16 +31,24 @@ export class SessionStatus {
 
   fill(group, sid) {
     const items = this.data[sid] || [];
-    const signature = JSON.stringify(items.map(({ plugin, name, state, label, detail, pane, pid }) => ({ plugin, name, state, label, detail, pane, pid })));
+    const signature = JSON.stringify(
+      items.map(({ plugin, name, state, label, detail, pane, pid }) => ({
+        plugin,
+        name,
+        state,
+        label,
+        detail,
+        pane,
+        pid,
+      })),
+    );
     if (group.dataset.signature === signature) return;
     group.dataset.signature = signature;
     group.replaceChildren();
     for (const item of items) {
-      const badge = document.createElement('span');
-      badge.className = 'plugin-badge';
+      const badge = el('span', 'plugin-badge', `${item.name} · ${item.label}`);
       badge.dataset.plugin = item.plugin;
       badge.dataset.state = item.state;
-      badge.textContent = `${item.name} · ${item.label}`;
       badge.title = item.detail || `${item.name} · ${item.label} (${item.pane})`;
       group.append(badge);
     }
@@ -47,7 +56,8 @@ export class SessionStatus {
   }
 
   update() {
-    for (const group of document.querySelectorAll('[data-plugin-session]')) this.fill(group, group.dataset.pluginSession);
+    for (const group of document.querySelectorAll('[data-plugin-session]'))
+      this.fill(group, group.dataset.pluginSession);
   }
 
   async refresh() {
@@ -65,11 +75,25 @@ export class SessionStatus {
       if (generation !== this.generation) return;
       if (error.status === 401) this.data = {};
       else {
-        this.data = Object.fromEntries(Object.entries(this.data).map(([sid, badges]) => [sid, badges.map((badge) => ({ ...badge, state: 'unknown', label: '状态暂不可用', detail: '状态服务未响应，恢复连接后将自动更新' }))]));
+        this.data = Object.fromEntries(
+          Object.entries(this.data).map(([sid, badges]) => [
+            sid,
+            badges.map((badge) => ({
+              ...badge,
+              state: 'unknown',
+              label: '状态暂不可用',
+              detail: '状态服务未响应，恢复连接后将自动更新',
+            })),
+          ]),
+        );
       }
     } finally {
       clearTimeout(timeout);
-      if (generation === this.generation) { this.controller = null; this.busy = false; this.update(); }
+      if (generation === this.generation) {
+        this.controller = null;
+        this.busy = false;
+        this.update();
+      }
     }
   }
 }

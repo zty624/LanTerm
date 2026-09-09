@@ -1,68 +1,38 @@
-# Session 状态插件
+# 状态插件
 
-LanTerm 的状态采集通过独立插件完成。默认启用 `codex`，在会话侧栏显示状态；无需改变原来启动 Codex 的方式。在 LanTerm 的 Bash / Zsh 中直接运行 `codex` 即可。
+默认启用 Codex 插件，在终端直接运行 `codex` 即可。关闭插件：
 
 ```bash
-./launch.sh --plugins codex
-# 完全禁用状态采集
 ./launch.sh --plugins none
 ```
 
-已有服务更新后需要重启 **Web 服务** 并刷新浏览器。使用原来的 `--state-dir`，tmux 和 Codex 进程会继续保留。不要执行 `tmux kill-server`。状态会在重新登录后自动恢复识别。
-
-## Codex 状态
-
-| 侧栏显示 | 含义 |
+| 状态 | 含义 |
 | --- | --- |
-| Working · 工作中 | Codex 有进行中的任务，包括思考、工具执行、等待后台命令 |
-| 等待输入 | 任务结束后等待下一条消息，或正在提出阻塞式用户问题 |
-| 等待确认 / 输入 | Codex 标题报告 Action Required；打开终端查看具体审批或提问 |
-| 启动中 | Codex 明确报告 Starting |
-| 已中断 · 等待输入 | 任务收到中断事件 |
-| 已暂停 | Codex 进程被挂起，例如 Ctrl+Z |
-| 已退出 | 检测到的 Codex 进程退出，保留提示 30 秒；Shell 继续运行 |
-| 状态未知 | 进程存在，但缺少可识别的事件或没有读取权限 |
+| Working · 工作中 | 任务进行中，包括思考、工具执行和等待后台命令 |
+| 等待输入 | 等待下一条消息或阻塞式提问的回答 |
+| 等待确认 / 输入 | Codex 报告 Action Required，打开终端查看具体内容 |
+| 启动中 / 已中断 / 已暂停 | 对应启动、中断事件或挂起进程 |
+| 已退出 | 进程结束，提示保留 30 秒 |
+| 状态未知 | 检测到进程，但无法读取或识别状态 |
 
-浏览器每 0.5 秒拉取一次，服务端共享 0.25 秒采样缓存。单页面通常在下一次轮询时看到变化，网络与采样耗时会增加延迟；这不是逐事件推送，短于采样周期的状态可能不会显示。状态不变时保留原有 badge，避免重复重画。所有会话的所有 pane 都会被检查，切换会话或断开终端 WebSocket 不影响采样。没有打开浏览器时不持续采样；重新打开会从当前进程和事件恢复状态。
+浏览器每 0.5 秒查询，后端缓存 0.25 秒。状态不变时保留原有元素；没有打开页面时停止采样。网络延迟、采样耗时会影响更新速度，短暂状态可能被跳过。
 
-### 状态来源与限制
+## 识别方式
 
-1. 以 LanTerm 专用 tmux socket 中的 pane 为边界，通过进程树和终端设备确认本地 `codex` 进程。不会用目录名匹配会话，不会把两个相同工作目录的 session 混在一起。
-2. 仅检查该进程已打开的 `rollout-*.jsonl` 文件，读取根 CLI / exec 会话的生命周期字段。`task_started` 对应工作中，`task_complete` 对应等待输入，`turn_aborted` 对应中断。阻塞式 `request_user_input` 调用与返回分别进入和离开等待状态；异步问题不当作阻塞。过滤 subagent 日志；CLI 切换线程时选择最近写入的根日志。
-3. tmux 保存的 Codex OSC 标题补充启动、工作和 Action Required 信号。标题不区分审批与普通提问，因此合并显示“等待确认 / 输入”。插件不会自动审批、提交回答或向 Codex 注入按键。
+按 tmux pane 的进程树和终端设备定位本机 Codex，再读取它已打开的根会话日志与终端标题。子代理日志会被过滤；切换线程时选择最近写入的根日志。
 
-这是适配器，不是 Codex 的稳定遥测 API。生命周期字段已对照本机 **Codex CLI 0.153.4**；标题模式参考 [Codex 官方实现](https://github.com/openai/codex/blob/main/codex-rs/tui/src/chatwidget/status_surfaces.rs)。Codex 版本、标题设置或事件格式变化可能降低识别能力。默认关闭标题动画、禁用标题或一次任务产生超过采样上限的连续输出时，部分状态可能暂时显示未知。不会按 CPU 高低、输出速度或长时间静默猜测任务是否结束。
+生命周期字段对照 Codex CLI 0.153.4，标题模式参考 [Codex 源码](https://github.com/openai/codex/blob/main/codex-rs/tui/src/chatwidget/status_surfaces.rs)。这些字段可能随版本变化。SSH 内的远端 Codex 无法识别；共享 app-server / remote 模式也可能缺少信号。
 
-通过 SSH 在另一台机器中运行的 Codex 不会被本机插件识别，LanTerm 只能看到 SSH 进程。不向当前 CLI 进程开放日志的共享 app-server / remote 模式也不能保证完整识别；检测到 CLI 但没有可靠信号时显示未知。初始会话选择界面、登录页面和错误页面也可能显示未知。`已退出` 只表示进程消失，不推断成功或失败。
+日志按 1 MiB 窗口增量读取，API 只返回状态和进程标识，不返回对话或工具参数。插件不修改 Codex 配置，也不代替用户审批或回答。
 
-采样不递归扫描 `$CODEX_HOME/sessions`，也不读取认证配置。日志按文件增量读取，每次最多 1 MiB；支持未写完的 JSON 行、文件截断和替换。API 只返回插件名、状态、pane、PID、采样时间和固定说明，不返回 prompt、回复、工具参数、标题内容或日志路径。不新增数据库或状态文件。
+## 扩展
 
-官方提供 [App Server 状态接口](https://learn.chatgpt.com/docs/app-server) 和 [Hooks](https://learn.chatgpt.com/docs/hooks)，但连接一个不同的 app-server 不能代表用户正在操作的 TUI，Hooks 还涉及来源信任配置。因此本插件采用只读的本地适配，不修改用户的 Codex 配置，也不接管 CLI。
+1. 在 `terminal/plugins/` 实现 `StatusPlugin`，提供 `id`、`name`、`version` 和 `sample(panes)`。
+2. 在 `registry.py` 的 `PROVIDERS` 注册类，构造参数为 `Sessions`。
+3. 用 `--plugins codex,插件名` 启用。
 
-## 添加其他插件
+`sample` 接收 `Pane(session, id, pid, dead, tty)`，返回 `{session_id: [badge, ...]}`。耗时读取放到 `asyncio.to_thread`，限制读取范围和大小。
 
-后端入口是 `terminal/plugins/registry.py` 的 `PROVIDERS`。新增一个实现 `terminal/plugins/base.py` 中 `StatusPlugin` 接口的类并注册名称；启动时用 `--plugins codex,新插件名` 启用。多个插件的 badge 可以并列显示。
+Badge 字段为 `plugin`、`name`、`state`、`label`、`detail`、`source`、`pane`、`pid`、`observed_at`。前端通过 `web/plugins.js` 渲染。
 
-插件需要提供 `id`、`name`、`version`，构造参数为 `Sessions`。异步 `sample(panes)` 接收 `Pane(session, id, pid, dead, tty)` 列表，返回 `{session_id: [badge, ...]}`。耗时的进程或文件读取放入 `asyncio.to_thread`，应有明确的大小和范围限制，不影响 PTY 的输入输出。
-
-每个 badge 使用以下字段；状态名称与中文标签由插件自己提供：
-
-```json
-{
-  "plugin": "codex",
-  "name": "Codex",
-  "state": "working",
-  "label": "Working · 工作中",
-  "detail": "",
-  "source": "lifecycle",
-  "pane": "%0",
-  "pid": 12345,
-  "observed_at": 1788880000
-}
-```
-
-`GET /api/plugins/status` 返回启用插件、各会话的 badge 和采样时间，沿用登录 Cookie 验证。`GET /api/config` 的 `plugins` 字段列出启用插件。插件读取失败与 API 请求失败不会断开终端；前端请求失败时将已有 badge 标为“状态暂不可用”，避免保留过期的 Working 状态。
-
-前端通用渲染器在 `web/plugins.js`，只使用 `textContent` 显示插件文字，不依赖 Codex 的状态解析逻辑。PTY、tmux 会话生命周期和资源监控均不依赖 Codex 插件。
-
-测试使用隔离的真实 tmux / PTY 和可控制的 Codex 生命周期记录，验证切换状态、后台会话、子代理过滤、重启恢复及退出后的 Shell 保留；不会启动付费模型请求。
+`GET /api/plugins/status` 返回各会话状态，`GET /api/config` 列出启用插件，均需登录。更新插件后重启 Web 服务并刷新页面。

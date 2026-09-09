@@ -12,124 +12,405 @@
   <body>
     <section id="login-screen" class="login-screen">
       <form id="login-form" class="login-card">
-        <img class="brand-icon" src="static/lantern.svg" alt="LanTerm 灯笼 Logo" width="64" height="64" />
+        <img
+          class="brand-icon"
+          src="static/lantern.svg"
+          alt="LanTerm 灯笼 Logo"
+          width="64"
+          height="64"
+        />
         <span class="eyebrow">YOUR SHELL, IN YOUR BROWSER</span>
         <h1>LanTerm</h1>
         <p>连接你的工作环境，接着上次的地方继续。</p>
         <label for="password">访问密码</label>
-        <input id="password" type="password" required autocomplete="current-password" autofocus placeholder="输入服务器的访问密码" />
+        <input
+          id="password"
+          type="password"
+          required
+          autocomplete="current-password"
+          autofocus
+          placeholder="输入服务器的访问密码"
+        />
         <p id="login-error" class="form-error" role="alert"></p>
-        <button type="submit" class="primary">连接终端 <span>↗</span></button>
+        <button type="submit" class="primary">
+          连接终端
+          <span>↗</span>
+        </button>
         <small>真实 Shell · 独立会话 · 断线保留</small>
       </form>
     </section>
 
     <main id="workspace" hidden>
       <aside id="sidebar">
-        <div class="brand"><img class="brand-icon small" src="static/lantern.svg" alt="灯笼" width="32" height="32" /><strong>LanTerm</strong><span class="tag">LOCAL</span></div>
-        <div class="section-label"><span>终端会话</span><span id="session-count">0</span></div>
-        <button id="new-session" class="new-session"><span>＋</span> 新建会话 <kbd>⌃ ⇧ K</kbd></button>
-        <div class="session-filters">
-          <input id="filter-query" type="search" aria-label="搜索会话" placeholder="搜索名称、标签、目录…" />
-          <div class="filter-row"><select id="filter-group" aria-label="筛选分组"><option value="">全部分组</option></select><select id="filter-status" aria-label="筛选状态"><option value="all">全部状态</option><option value="running">运行中</option><option value="exited">已退出</option><option value="attached">已连接</option><option value="detached">后台运行</option><option value="pinned">已置顶</option></select></div>
-          <div class="filter-row"><select id="session-sort" aria-label="会话排序"><option value="created">创建时间</option><option value="activity">最近活动</option><option value="name">名称排序</option></select><button id="batch-mode">批量管理</button></div>
+        <div class="brand">
+          <img
+            class="brand-icon small"
+            src="static/lantern.svg"
+            alt="灯笼"
+            width="32"
+            height="32"
+          />
+          <strong>LanTerm</strong>
+          <span class="tag">LOCAL</span>
         </div>
-        <div id="batch-tools" class="batch-tools" hidden><span id="selected-count">已选 0</span><button id="select-visible">全选结果</button><button id="clear-selected">清空</button><button id="batch-group">移入分组</button><button id="batch-pin">置顶</button><button id="batch-close" class="danger-subtle">关闭所选</button></div>
+        <div class="section-label">
+          <span>终端会话</span>
+          <span id="session-count">0</span>
+        </div>
+        <button id="new-session" class="new-session">
+          <span>＋</span>
+          新建会话
+          <kbd>⌃ ⇧ K</kbd>
+        </button>
+        <div class="session-filters">
+          <input
+            id="filter-query"
+            type="search"
+            aria-label="搜索会话"
+            placeholder="搜索名称、标签、目录…"
+          />
+          <div class="filter-row">
+            <select id="filter-group" aria-label="筛选分组">
+              <option value="">全部分组</option>
+            </select>
+            <select id="filter-status" aria-label="筛选状态">
+              <option value="all">全部状态</option>
+              <option value="running">运行中</option>
+              <option value="exited">已退出</option>
+              <option value="attached">已连接</option>
+              <option value="detached">后台运行</option>
+              <option value="pinned">已置顶</option>
+            </select>
+          </div>
+          <div class="filter-row">
+            <select id="session-sort" aria-label="会话排序">
+              <option value="created">创建时间</option>
+              <option value="activity">最近活动</option>
+              <option value="name">名称排序</option>
+            </select>
+            <button id="batch-mode">批量管理</button>
+          </div>
+        </div>
+        <div id="batch-tools" class="batch-tools" hidden>
+          <span id="selected-count">已选 0</span>
+          <button id="select-visible">全选结果</button>
+          <button id="clear-selected">清空</button>
+          <button id="batch-group">移入分组</button>
+          <button id="batch-pin">置顶</button>
+          <button id="batch-close" class="danger-subtle">关闭所选</button>
+        </div>
         <div id="session-list" role="list" aria-label="终端会话"></div>
         <div class="sidebar-footer">
-          <span class="dot"></span><span id="host-label"></span>
-          <button id="logout" class="icon-button" title="退出登录，保留终端进程" aria-label="退出登录">↪</button>
+          <span class="dot"></span>
+          <span id="host-label"></span>
+          <button
+            id="logout"
+            class="icon-button"
+            title="退出登录，保留终端进程"
+            aria-label="退出登录"
+          >
+            ↪
+          </button>
         </div>
       </aside>
       <section class="main-panel">
         <header class="toolbar">
-          <button id="toggle-sidebar" class="icon-button" title="切换侧栏" aria-label="切换侧栏">☰</button>
-          <div class="session-heading"><strong id="active-name">工作空间</strong><span id="active-detail">选择或新建一个终端</span></div>
+          <button id="toggle-sidebar" class="icon-button" title="切换侧栏" aria-label="切换侧栏">
+            ☰
+          </button>
+          <div class="session-heading">
+            <strong id="active-name">工作空间</strong>
+            <span id="active-detail">选择或新建一个终端</span>
+          </div>
           <div class="toolbar-actions" id="session-actions" hidden>
             <button id="rename-session" title="重命名会话">重命名</button>
             <button id="pin-session">置顶</button>
-            <button id="duplicate-session" title="使用相同 Shell、当前目录和分组创建新会话">复制</button>
+            <button id="duplicate-session" title="使用相同 Shell、当前目录和分组创建新会话">
+              复制
+            </button>
             <button id="session-details">详情</button>
             <button id="show-history" title="查看 tmux 保留的完整历史">历史</button>
             <button id="show-search" title="搜索当前终端缓冲区 · Ctrl+Shift+F">搜索</button>
             <button id="show-paste" title="粘贴文本；也可直接使用 Ctrl+Shift+V">粘贴</button>
             <button id="show-keys" title="发送被浏览器占用的控制键">按键</button>
             <button id="restart-session" hidden>重新启动</button>
-            <button id="close-session" class="danger-subtle" title="结束此会话及其中的进程">关闭</button>
+            <button id="close-session" class="danger-subtle" title="结束此会话及其中的进程">
+              关闭
+            </button>
           </div>
           <button id="show-monitor" class="monitor-toggle">资源监控</button>
           <button id="fullscreen" class="icon-button" title="全屏" aria-label="全屏">⛶</button>
         </header>
         <div id="search-bar" class="search-bar" hidden>
           <input id="search-input" aria-label="搜索终端" placeholder="搜索当前缓冲区…" />
-          <button id="search-prev" aria-label="上一个结果">↑</button><button id="search-next" aria-label="下一个结果">↓</button>
+          <button id="search-prev" aria-label="上一个结果">↑</button>
+          <button id="search-next" aria-label="下一个结果">↓</button>
           <button id="search-close" aria-label="关闭搜索">×</button>
         </div>
         <div id="empty-state" class="empty-state">
-          <div class="terminal-art" aria-hidden="true"><span>~/workspace</span><p><b>❯</b> <i></i></p></div>
+          <div class="terminal-art" aria-hidden="true">
+            <span>~/workspace</span>
+            <p>
+              <b>❯</b>
+              <i></i>
+            </p>
+          </div>
           <h2>一个终端，无限可能。</h2>
-          <p>启动 Bash 或 Zsh，运行你熟悉的命令和工具。<br />每个会话独立运行，离开页面也会继续。</p>
+          <p>
+            启动 Bash 或 Zsh，运行你熟悉的命令和工具。
+            <br />
+            每个会话独立运行，离开页面也会继续。
+          </p>
           <button id="first-session" class="primary">＋ 创建第一个会话</button>
-          <div class="tool-chips"><span>bash</span><span>zsh</span><span>vim</span><span>codex</span><span>htop</span></div>
+          <div class="tool-chips">
+            <span>bash</span>
+            <span>zsh</span>
+            <span>vim</span>
+            <span>codex</span>
+            <span>htop</span>
+          </div>
         </div>
         <div id="terminal" hidden aria-label="交互终端"></div>
         <section id="monitor-view" class="monitor-view" hidden aria-label="资源监控面板">
           <div class="monitor-content">
-            <div class="monitor-heading"><div><span class="eyebrow">RESOURCE MONITOR</span><h2>资源总览</h2><p id="monitor-scope">正在读取运行环境…</p></div><div class="monitor-update"><span id="monitor-updated">正在采样</span><button id="monitor-refresh" title="获取最新的资源采样">↻ 刷新</button></div></div>
+            <div class="monitor-heading">
+              <div>
+                <span class="eyebrow">RESOURCE MONITOR</span>
+                <h2>资源总览</h2>
+                <p id="monitor-scope">正在读取运行环境…</p>
+              </div>
+              <div class="monitor-update">
+                <span id="monitor-updated">正在采样</span>
+                <button id="monitor-refresh" title="获取最新的资源采样">↻ 刷新</button>
+              </div>
+            </div>
             <p id="monitor-error" class="form-error" role="alert"></p>
-            <p id="monitor-warmup" class="monitor-note" hidden>正在采集速率，下一次采样后自动显示。</p>
+            <p id="monitor-warmup" class="monitor-note" hidden>
+              正在采集速率，下一次采样后自动显示。
+            </p>
             <div id="metric-cards" class="metric-cards"></div>
-            <div class="monitor-section-heading"><h3>GPU 设备</h3><span>设备整体用量，可能包含其他进程</span></div>
+            <div class="monitor-section-heading">
+              <h3>GPU 设备</h3>
+              <span>设备整体用量，可能包含其他进程</span>
+            </div>
             <div id="gpu-cards" class="gpu-cards"></div>
             <p id="gpu-note" class="monitor-empty" hidden></p>
             <p id="gpu-scope" class="monitor-note" hidden></p>
-            <div class="monitor-section-heading"><h3>会话资源 <span id="resource-session-count" class="count-badge"></span></h3><span>CPU 100% = 1 核 · 内存为进程树 RSS 合计</span></div>
-            <div class="table-scroll"><table class="resource-table"><thead><tr><th>会话</th><th>分组</th><th>状态</th><th>进程数</th><th>CPU</th><th>内存 RSS</th><th>操作</th></tr></thead><tbody id="session-resources"></tbody></table></div>
-            <p id="session-resources-empty" class="monitor-empty" hidden>暂无会话。新建终端后，这里会显示对应的进程资源。</p>
-            <details class="monitor-help"><summary>统计范围与说明</summary><p>CPU、内存和进程数优先统计当前 cgroup，卡片会注明范围。工作目录存储为所在文件系统的用量，网络统计不含本地回环接口。GPU 利用率和显存占用分别显示。</p><p>共享内存页可能在多个进程的 RSS 中重复计算；脱离会话进程树的进程不计入该会话。首次采样或页面长时间不可见后，速率需要下一次采样才能显示。不可读取的指标显示为 —。</p></details>
+            <div class="monitor-section-heading">
+              <h3>
+                会话资源
+                <span id="resource-session-count" class="count-badge"></span>
+              </h3>
+              <span>CPU 100% = 1 核 · 内存为进程树 RSS 合计</span>
+            </div>
+            <div class="table-scroll">
+              <table class="resource-table">
+                <thead>
+                  <tr>
+                    <th>会话</th>
+                    <th>分组</th>
+                    <th>状态</th>
+                    <th>进程数</th>
+                    <th>CPU</th>
+                    <th>内存 RSS</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="session-resources"></tbody>
+              </table>
+            </div>
+            <p id="session-resources-empty" class="monitor-empty" hidden>
+              暂无会话。新建终端后，这里会显示对应的进程资源。
+            </p>
+            <details class="monitor-help">
+              <summary>统计范围与说明</summary>
+              <p>
+                CPU、内存和进程数优先统计当前
+                cgroup，卡片会注明范围。工作目录存储为所在文件系统的用量，网络统计不含本地回环接口。GPU
+                利用率和显存占用分别显示。
+              </p>
+              <p>
+                共享内存页可能在多个进程的 RSS
+                中重复计算；脱离会话进程树的进程不计入该会话。首次采样或页面长时间不可见后，速率需要下一次采样才能显示。不可读取的指标显示为
+                —。
+              </p>
+            </details>
           </div>
         </section>
-        <div id="reconnect-banner" class="reconnect-banner" hidden><span id="reconnect-text">连接已断开，正在重新连接…</span><button id="reconnect-now">立即重连</button></div>
+        <div id="reconnect-banner" class="reconnect-banner" hidden>
+          <span id="reconnect-text">连接已断开，正在重新连接…</span>
+          <button id="reconnect-now">立即重连</button>
+        </div>
         <footer class="statusbar">
-          <span><span id="connection-dot" class="dot muted"></span><span id="connection-status">准备就绪</span></span>
+          <span>
+            <span id="connection-dot" class="dot muted"></span>
+            <span id="connection-status">准备就绪</span>
+          </span>
           <span id="terminal-size"></span>
           <span class="keyboard-hint">Shift + 拖选复制 · 滚轮查看历史</span>
-          <div class="zoom" title="终端字号"><button id="zoom-out" aria-label="缩小字体">−</button><span id="font-size">16px</span><button id="zoom-in" aria-label="放大字体">＋</button></div>
+          <div class="zoom" title="终端字号">
+            <button id="zoom-out" aria-label="缩小字体">−</button>
+            <span id="font-size">16px</span>
+            <button id="zoom-in" aria-label="放大字体">＋</button>
+          </div>
         </footer>
-        <nav class="keybar" aria-label="终端快捷键"><button data-key="esc">Esc</button><button data-key="tab">Tab</button><button data-key="interrupt">Ctrl+C</button><button data-key="suspend">Ctrl+Z</button><button data-key="eof">Ctrl+D</button><button data-key="word">Ctrl+W</button><button data-key="transpose">Ctrl+T</button><button data-key="next">Ctrl+N</button><button data-key="clear">Ctrl+L</button><button data-key="slash" title="发送 Ctrl+/（终端控制字符 0x1f）">Ctrl+/</button><button data-key="up">↑</button><button data-key="down">↓</button></nav>
+        <nav class="keybar" aria-label="终端快捷键">
+          <button data-key="esc">Esc</button>
+          <button data-key="tab">Tab</button>
+          <button data-key="interrupt">Ctrl+C</button>
+          <button data-key="suspend">Ctrl+Z</button>
+          <button data-key="eof">Ctrl+D</button>
+          <button data-key="word">Ctrl+W</button>
+          <button data-key="transpose">Ctrl+T</button>
+          <button data-key="next">Ctrl+N</button>
+          <button data-key="clear">Ctrl+L</button>
+          <button data-key="slash" title="发送 Ctrl+/（终端控制字符 0x1f）">Ctrl+/</button>
+          <button data-key="up">↑</button>
+          <button data-key="down">↓</button>
+        </nav>
       </section>
     </main>
 
     <dialog id="session-dialog">
       <form id="session-form">
-        <div class="dialog-heading"><h2 id="dialog-title">新建会话</h2><button type="button" class="icon-button" data-dismiss aria-label="取消">×</button></div>
-        <label for="session-name">会话名称</label><input id="session-name" maxlength="80" required placeholder="例如：Codex · 项目开发" />
-        <div class="form-columns"><div><label for="session-group">分组</label><input id="session-group" list="group-options" maxlength="40" placeholder="例如：训练 / 开发" /></div><div><label for="session-tags">标签</label><input id="session-tags" placeholder="逗号分隔，最多 8 个" /></div></div>
-        <label for="session-note">备注</label><textarea id="session-note" rows="2" maxlength="500" placeholder="这个会话的用途…"></textarea>
+        <div class="dialog-heading">
+          <h2 id="dialog-title">新建会话</h2>
+          <button type="button" class="icon-button" data-dismiss aria-label="取消">×</button>
+        </div>
+        <label for="session-name">会话名称</label>
+        <input id="session-name" maxlength="80" required placeholder="例如：Codex · 项目开发" />
+        <div class="form-columns">
+          <div>
+            <label for="session-group">分组</label>
+            <input
+              id="session-group"
+              list="group-options"
+              maxlength="40"
+              placeholder="例如：训练 / 开发"
+            />
+          </div>
+          <div>
+            <label for="session-tags">标签</label>
+            <input id="session-tags" placeholder="逗号分隔，最多 8 个" />
+          </div>
+        </div>
+        <label for="session-note">备注</label>
+        <textarea
+          id="session-note"
+          rows="2"
+          maxlength="500"
+          placeholder="这个会话的用途…"
+        ></textarea>
         <div id="create-options">
-          <label for="session-shell">Shell</label><select id="session-shell"></select>
-          <label for="session-cwd">初始目录</label><input id="session-cwd" required placeholder="/path/to/project" />
+          <label for="session-shell">Shell</label>
+          <select id="session-shell"></select>
+          <label for="session-cwd">初始目录</label>
+          <input id="session-cwd" required placeholder="/path/to/project" />
         </div>
         <p id="session-error" class="form-error" role="alert"></p>
-        <div class="dialog-footer"><button type="button" data-dismiss>取消</button><button id="session-submit" class="primary" type="submit">创建会话</button></div>
+        <div class="dialog-footer">
+          <button type="button" data-dismiss>取消</button>
+          <button id="session-submit" class="primary" type="submit">创建会话</button>
+        </div>
       </form>
     </dialog>
 
     <datalist id="group-options"></datalist>
-    <dialog id="batch-dialog"><form id="batch-form"><div class="dialog-heading"><h2 id="batch-title">批量操作</h2><button type="button" data-dismiss class="icon-button" aria-label="取消">×</button></div><p id="batch-description"></p><ul id="batch-preview"></ul><div id="batch-group-field"><label for="batch-group-name">目标分组</label><input id="batch-group-name" list="group-options" maxlength="40" placeholder="留空移入未分组" /></div><p id="batch-error" class="form-error" role="alert"></p><div class="dialog-footer"><button type="button" data-dismiss>取消</button><button id="batch-submit" type="submit" class="primary">执行</button></div></form></dialog>
-    <dialog id="details-dialog" class="details-dialog"><div class="dialog-heading"><h2 id="details-title">会话详情</h2><button data-dismiss class="icon-button" aria-label="关闭详情">×</button></div><div id="details-summary" class="details-summary"></div><p id="details-note"></p><div class="monitor-section-heading"><h3>会话进程</h3><span>CPU 100% = 1 核</span></div><div class="table-scroll"><table class="resource-table"><thead><tr><th>PID</th><th>程序</th><th>状态</th><th>CPU</th><th>内存 RSS</th><th>运行时间</th></tr></thead><tbody id="process-table"></tbody></table></div><p id="details-error" class="form-error" role="alert"></p></dialog>
+    <dialog id="batch-dialog">
+      <form id="batch-form">
+        <div class="dialog-heading">
+          <h2 id="batch-title">批量操作</h2>
+          <button type="button" data-dismiss class="icon-button" aria-label="取消">×</button>
+        </div>
+        <p id="batch-description"></p>
+        <ul id="batch-preview"></ul>
+        <div id="batch-group-field">
+          <label for="batch-group-name">目标分组</label>
+          <input
+            id="batch-group-name"
+            list="group-options"
+            maxlength="40"
+            placeholder="留空移入未分组"
+          />
+        </div>
+        <p id="batch-error" class="form-error" role="alert"></p>
+        <div class="dialog-footer">
+          <button type="button" data-dismiss>取消</button>
+          <button id="batch-submit" type="submit" class="primary">执行</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="details-dialog" class="details-dialog">
+      <div class="dialog-heading">
+        <h2 id="details-title">会话详情</h2>
+        <button data-dismiss class="icon-button" aria-label="关闭详情">×</button>
+      </div>
+      <div id="details-summary" class="details-summary"></div>
+      <p id="details-note"></p>
+      <div class="monitor-section-heading">
+        <h3>会话进程</h3>
+        <span>CPU 100% = 1 核</span>
+      </div>
+      <div class="table-scroll">
+        <table class="resource-table">
+          <thead>
+            <tr>
+              <th>PID</th>
+              <th>程序</th>
+              <th>状态</th>
+              <th>CPU</th>
+              <th>内存 RSS</th>
+              <th>运行时间</th>
+            </tr>
+          </thead>
+          <tbody id="process-table"></tbody>
+        </table>
+      </div>
+      <p id="details-error" class="form-error" role="alert"></p>
+    </dialog>
 
     <dialog id="confirm-dialog">
-      <form id="confirm-form"><h2>关闭这个会话？</h2><p>「<strong id="close-name"></strong>」中的 Shell 和正在运行的程序将结束。</p><p class="muted-text">如果只是暂时离开，直接关闭浏览器页面即可。</p><p id="close-error" class="form-error" role="alert"></p><div class="dialog-footer"><button type="button" data-dismiss>保留会话</button><button class="danger" type="submit">结束会话</button></div></form>
+      <form id="confirm-form">
+        <h2>关闭这个会话？</h2>
+        <p>
+          「
+          <strong id="close-name"></strong>
+          」中的 Shell 和正在运行的程序将结束。
+        </p>
+        <p class="muted-text">如果只是暂时离开，直接关闭浏览器页面即可。</p>
+        <p id="close-error" class="form-error" role="alert"></p>
+        <div class="dialog-footer">
+          <button type="button" data-dismiss>保留会话</button>
+          <button class="danger" type="submit">结束会话</button>
+        </div>
+      </form>
     </dialog>
 
     <dialog id="paste-dialog">
-      <form id="paste-form"><div class="dialog-heading"><h2>粘贴到终端</h2><button type="button" data-dismiss class="icon-button" aria-label="取消">×</button></div><p>在下方粘贴文本，再发送到当前会话。</p><textarea id="paste-text" rows="8" spellcheck="false" aria-label="待粘贴文本"></textarea><div class="dialog-footer"><button type="button" data-dismiss>取消</button><button class="primary" type="submit">发送到终端</button></div></form>
+      <form id="paste-form">
+        <div class="dialog-heading">
+          <h2>粘贴到终端</h2>
+          <button type="button" data-dismiss class="icon-button" aria-label="取消">×</button>
+        </div>
+        <p>在下方粘贴文本，再发送到当前会话。</p>
+        <textarea id="paste-text" rows="8" spellcheck="false" aria-label="待粘贴文本"></textarea>
+        <div class="dialog-footer">
+          <button type="button" data-dismiss>取消</button>
+          <button class="primary" type="submit">发送到终端</button>
+        </div>
+      </form>
     </dialog>
 
     <dialog id="history-dialog" class="history-dialog">
-      <div class="dialog-heading"><h2>会话历史</h2><div><button id="download-history">下载 .txt</button><button data-dismiss class="icon-button" aria-label="关闭历史">×</button></div></div>
-      <p>保留最近 20,000 行。全屏程序的当前画面可在终端中查看。</p><pre id="history-content" tabindex="0"></pre>
+      <div class="dialog-heading">
+        <h2>会话历史</h2>
+        <div>
+          <button id="download-history">下载 .txt</button>
+          <button data-dismiss class="icon-button" aria-label="关闭历史">×</button>
+        </div>
+      </div>
+      <p>保留最近 20,000 行。全屏程序的当前画面可在终端中查看。</p>
+      <pre id="history-content" tabindex="0"></pre>
     </dialog>
     <div id="toast" class="toast" role="status" hidden></div>
   </body>
