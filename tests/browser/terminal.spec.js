@@ -1,6 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 import { spawn, execFile } from 'node:child_process';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -120,6 +120,120 @@ async function run(page, command) {
   await page.keyboard.type(command);
   await page.keyboard.press('Enter');
 }
+
+test('tmux splits support independent input, mouse resizing, Vim and reconnect', async ({
+  page,
+  service,
+}) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Split workspace');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  const item = (await (await page.request.get(service.url + '/api/sessions')).json())[0];
+  const listing = async () => {
+    const response = await page.request.get(`${service.url}/api/sessions/${item.id}/panes`);
+    expect(response.ok()).toBeTruthy();
+    return response.json();
+  };
+  const first = (await listing()).active;
+  await run(page, "export LT_SPLIT_UI=left; printf 'left:%s\\n' ready");
+  await expect(page.locator('.xterm-rows')).toContainText('left:ready');
+  await page.locator('#show-panes').click();
+  await expect(page.locator('#pane-close')).toBeDisabled();
+  await page.getByRole('button', { name: '左右分屏', exact: true }).click();
+  await expect(page.locator('#pane-dialog')).not.toBeVisible();
+  const right = (await listing()).active;
+  expect(right).not.toBe(first);
+  await run(page, 'printf \'right:%s\\n\' "${LT_SPLIT_UI:-fresh}"');
+  await expect(page.locator('.xterm-rows')).toContainText('right:fresh');
+  await run(page, 'vim -Nu NONE -n split.txt');
+  await page.keyboard.press('i');
+  await page.keyboard.type('Split editor survives');
+  await expect(page.locator('.xterm-rows')).toContainText('-- INSERT --');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.xterm-rows')).not.toContainText('-- INSERT --');
+  await expect(page.locator('.xterm-rows')).toContainText('Split editor survives');
+  const geometry = async (pid) => {
+    const pane = (await listing()).panes.find((pane) => pane.id === pid);
+    const rect = await page.locator('.xterm-screen').boundingBox();
+    const [cols, rows] = (await page.locator('#terminal-size').textContent())
+      .split(' × ')
+      .map(Number);
+    return { pane, rect, cw: rect.width / cols, ch: rect.height / rows };
+  };
+  const focus = async (pid) => {
+    const { pane, rect, cw, ch } = await geometry(pid);
+    await page.mouse.click(rect.x + (pane.x + 2.5) * cw, rect.y + (pane.y + 2.5) * ch);
+    await expect.poll(async () => (await listing()).active).toBe(pid);
+  };
+  await focus(first);
+  await run(page, 'printf \'retained:%s\\n\' "$LT_SPLIT_UI"');
+  await expect(page.locator('.xterm-rows')).toContainText('retained:left');
+  const { pane: before, rect, cw, ch } = await geometry(first);
+  const border = rect.x + (before.x + before.cols + 0.5) * cw;
+  const height = rect.y + (before.y + 5.5) * ch;
+  await page.mouse.move(border, height);
+  await page.mouse.down();
+  await page.mouse.move(border + 6 * cw, height, { steps: 6 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => (await listing()).panes.find((pane) => pane.id === first).cols)
+    .toBeGreaterThan(before.cols);
+  await page.locator('#show-panes').click();
+  await page.locator('#pane-target').selectOption(first);
+  await page.getByRole('button', { name: '上下分屏', exact: true }).click();
+  await expect(page.locator('#pane-dialog')).not.toBeVisible();
+  const lower = (await listing()).active;
+  await run(page, "export LT_SPLIT_UI=lower; printf 'lower:%s\\n' ready");
+  await expect(page.locator('.xterm-rows')).toContainText('lower:ready');
+  const saved = (await listing()).panes.map(({ id, pid }) => ({ id, pid }));
+  expect(saved).toHaveLength(3);
+  await mkdir('.runtime', { recursive: true });
+  await page.screenshot({ path: '.runtime/tmux-splits.png' });
+  await page.reload();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await expect(page.locator('.xterm-rows')).toContainText('Split editor survives');
+  await run(page, 'printf \'reloaded:%s\\n\' "$LT_SPLIT_UI"');
+  await expect(page.locator('.xterm-rows')).toContainText('reloaded:lower');
+  await service.restart();
+  await expect(page.locator('#login-screen')).toBeVisible({ timeout: 20000 });
+  await login(page, service);
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  expect((await listing()).panes.map(({ id, pid }) => ({ id, pid }))).toEqual(saved);
+  await focus(right);
+  await page.locator('.xterm-helper-textarea').focus();
+  await page.keyboard.type(':wq');
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(join(service.folder, 'split.txt'), 'utf8').catch(() => ''))
+    .toBe('Split editor survives\n');
+  await page.locator('#show-panes').click();
+  await page.locator('#pane-target').selectOption(lower);
+  await page.getByRole('button', { name: '关闭此分屏', exact: true }).click();
+  expect((await listing()).panes).toHaveLength(3);
+  await page.getByRole('button', { name: '确认关闭分屏', exact: true }).click();
+  await expect(page.locator('#pane-dialog')).not.toBeVisible();
+  expect((await listing()).panes.map((pane) => pane.id)).toEqual([first, right]);
+  await page.locator('#show-panes').click();
+  await page.locator('#pane-target').selectOption(right);
+  await page.getByRole('button', { name: '放大分屏', exact: true }).click();
+  await expect(page.locator('#pane-dialog')).not.toBeVisible();
+  expect((await listing()).panes.every((pane) => pane.zoomed)).toBe(true);
+  await page.locator('#show-panes').click();
+  await page.getByRole('button', { name: '还原布局', exact: true }).click();
+  await expect(page.locator('#pane-dialog')).not.toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#show-panes').click();
+  await expect(page.locator('#pane-dialog')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: '.runtime/tmux-splits-mobile.png' });
+  expect(errors).toEqual([]);
+});
 
 test('Codex plugin updates inactive sessions, survives restart and sends Ctrl+/', async ({
   page,

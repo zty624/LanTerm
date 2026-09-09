@@ -65,20 +65,12 @@ class Sessions:
     async def list(self) -> list[dict]:
         fmt = (
             "#{session_name}\t#{@lt_meta}\t#{session_created}\t#{session_attached}"
-            "\t#{pane_dead}\t#{pane_pid}\t#{session_activity}"
+            "\t#{session_activity}"
         )
-        try:
-            out = await self.run(["list-sessions", "-F", fmt])
-        except subprocess.CalledProcessError as exc:
-            if "no server running" in exc.stderr or (
-                "error connecting to" in exc.stderr
-                and any(s in exc.stderr for s in ("No such file", "Connection refused"))
-            ):
-                return []
-            raise
-        items = []
+        out = await self.scan(["list-sessions", "-F", fmt])
+        items = {}
         for line in out.splitlines():
-            name, encoded, created, clients, dead, pid, activity = line.split("\t")
+            name, encoded, created, clients, activity = line.split("\t")
             if not name.startswith("lt-") or not encoded:
                 continue
             meta = {
@@ -88,18 +80,84 @@ class Sessions:
                 "note": "",
                 **json.loads(base64.urlsafe_b64decode(encoded)),
             }
-            items.append(
+            items[name] = dict(
+                id=name[3:],
+                **meta,
+                created=int(created),
+                clients=int(clients),
+                activity=int(activity or created),
+                panes=[],
+            )
+        if not items:
+            return []
+        fmt = (
+            "#{session_name}\t#{window_id}\t#{window_active}\t#{window_zoomed_flag}"
+            "\t#{pane_id}\t#{pane_index}\t#{pane_active}\t#{pane_dead}\t#{pane_pid}"
+            "\t#{pane_tty}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}"
+        )
+        for line in (await self.scan(["list-panes", "-a", "-F", fmt])).splitlines():
+            fields = line.split("\t")
+            if fields[0] not in items:
+                continue
+            (
+                name,
+                window,
+                visible,
+                zoomed,
+                pid,
+                index,
+                active,
+                dead,
+                process,
+                tty,
+                cols,
+                rows,
+                x,
+                y,
+            ) = fields
+            items[name]["panes"].append(
                 dict(
-                    id=name[3:],
-                    **meta,
-                    created=int(created),
-                    clients=int(clients),
-                    pid=int(pid),
-                    activity=int(activity or created),
-                    status="exited" if dead == "1" else "running",
+                    id=pid,
+                    window=window,
+                    visible=visible == "1",
+                    zoomed=zoomed == "1",
+                    index=int(index),
+                    active=active == "1",
+                    dead=dead == "1",
+                    pid=int(process),
+                    tty=tty,
+                    cols=int(cols),
+                    rows=int(rows),
+                    x=int(x),
+                    y=int(y),
                 )
             )
-        return sorted(items, key=lambda item: (item["created"], item["id"]))
+        result = []
+        for item in items.values():
+            panes = item["panes"]
+            if not panes:  # The session may have closed between the two tmux reads.
+                continue
+            active = next((pane for pane in panes if pane["visible"] and pane["active"]), panes[0])
+            item.update(
+                pid=active["pid"],
+                active_pane=active["id"],
+                active_dead=active["dead"],
+                pane_count=sum(pane["visible"] for pane in panes),
+                status="running" if any(not pane["dead"] for pane in panes) else "exited",
+            )
+            result.append(item)
+        return sorted(result, key=lambda item: (item["created"], item["id"]))
+
+    async def scan(self, args: list[str]) -> str:
+        try:
+            return await self.run(args)
+        except subprocess.CalledProcessError as exc:
+            if "no server running" in exc.stderr or (
+                "error connecting to" in exc.stderr
+                and any(s in exc.stderr for s in ("No such file", "Connection refused"))
+            ):
+                return ""
+            raise
 
     async def get(self, sid: str) -> dict:
         for item in await self.list():
@@ -197,21 +255,19 @@ class Sessions:
     async def restart(self, sid: str) -> dict:
         async with self.lock:
             item = await self.get(sid)
-            if item["status"] != "exited":
-                raise SessionError("只有已经退出的会话才能重新启动", 409)
+            if not item["active_dead"]:
+                raise SessionError("只有已经退出的分屏才能重新启动", 409)
             await self.run(
                 [
                     "respawn-pane",
                     "-t",
-                    f"lt-{sid}",
-                    "-c",
-                    item["cwd"],
-                    available_shells()[item["shell"]],
-                    "-l",
+                    item["active_pane"],
+                    "-e",
+                    f"LAN_TERMINAL_SESSION={sid}",
                 ]
             )
             return await self.get(sid)
 
     async def history(self, sid: str) -> str:
-        await self.get(sid)
-        return await self.run(["capture-pane", "-p", "-t", f"lt-{sid}", "-S", "-20000"])
+        item = await self.get(sid)
+        return await self.run(["capture-pane", "-p", "-t", item["active_pane"], "-S", "-20000"])

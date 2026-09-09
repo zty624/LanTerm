@@ -89,7 +89,7 @@ def process_data(items: list[dict], previous: dict, elapsed: float) -> tuple[dic
         parents[proc.info["ppid"]].append(proc.pid)
     current, result = {}, {}
     for item in items:
-        pending = [item["pid"]] if item["status"] == "running" else []
+        pending = [pane["pid"] for pane in item["panes"] if not pane["dead"]]
         seen, rows = set(), []
         cwd = None
         while pending:
@@ -156,7 +156,10 @@ class Monitor:
         self.cached = None
 
     async def get(self, items: list[dict]) -> dict:
-        key = tuple((item["id"], item["pid"], item["status"]) for item in items)
+        key = tuple(
+            (item["id"], item["pid"], tuple((pane["pid"], pane["dead"]) for pane in item["panes"]))
+            for item in items
+        )
         async with self.lock:
             if (
                 self.cached is not None

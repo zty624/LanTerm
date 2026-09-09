@@ -16,8 +16,9 @@ from starlette.requests import HTTPConnection
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from terminal.config import ASSETS, Config, available_shells
-from terminal.inputs import Batch, Create, Login, Metadata
+from terminal.inputs import Batch, Create, Login, Metadata, PaneAction, Split
 from terminal.monitor import Monitor
+from terminal.panes import Panes
 from terminal.plugins.registry import Plugins
 from terminal.proxy import PrefixMiddleware
 from terminal.pty import Terminal
@@ -46,6 +47,7 @@ class Auth:
 def create_app(config: Config, plugins: list[str]) -> FastAPI:
     app = FastAPI(title="LanTerm", docs_url=None, redoc_url=None, openapi_url=None)
     sessions = Sessions(config)
+    panes = Panes(sessions)
     auth = Auth(config)
     monitor = Monitor(config.cwd, Path("/proc"), 3.0)
     app.state.sessions = sessions
@@ -194,6 +196,22 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
     @api.get("/sessions/{sid}/history", response_class=PlainTextResponse)
     async def history(sid: str):
         return await sessions.history(sid)
+
+    @api.get("/sessions/{sid}/panes")
+    async def list_panes(sid: str):
+        return await panes.list(sid)
+
+    @api.post("/sessions/{sid}/panes", status_code=201)
+    async def split_pane(sid: str, body: Split):
+        return await panes.split(sid, body.pane, body.direction)
+
+    @api.post("/sessions/{sid}/panes/action")
+    async def pane_action(sid: str, body: PaneAction):
+        return await panes.action(sid, body.pane, body.action)
+
+    @api.delete("/sessions/{sid}/panes/{pid}", status_code=204)
+    async def close_pane(sid: str, pid: str):
+        await panes.close(sid, pid)
 
     @app.websocket("/ws/{sid}")
     async def terminal(

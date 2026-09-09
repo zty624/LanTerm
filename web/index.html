@@ -129,6 +129,7 @@
               复制
             </button>
             <button id="session-details">详情</button>
+            <button id="show-panes" title="左右 / 上下分屏，管理当前窗口">分屏</button>
             <button id="show-history" title="查看 tmux 保留的完整历史">历史</button>
             <button id="show-search" title="搜索当前终端缓冲区 · Ctrl+Shift+F">搜索</button>
             <button id="show-paste" title="粘贴文本；也可直接使用 Ctrl+Shift+V">粘贴</button>
@@ -367,6 +368,37 @@
         </table>
       </div>
       <p id="details-error" class="form-error" role="alert"></p>
+    </dialog>
+
+    <dialog id="pane-dialog">
+      <div class="dialog-heading">
+        <h2>终端分屏</h2>
+        <button data-dismiss class="icon-button" aria-label="关闭分屏面板">×</button>
+      </div>
+      <p id="pane-context"></p>
+      <label for="pane-target">操作分屏</label>
+      <select id="pane-target"></select>
+      <div class="pane-actions">
+        <button data-split="horizontal">左右分屏</button>
+        <button data-split="vertical">上下分屏</button>
+        <button id="pane-select">切换到此分屏</button>
+        <button id="pane-zoom">放大分屏</button>
+        <button id="pane-restart" hidden>重新启动分屏</button>
+        <button id="pane-close" class="danger-subtle">关闭此分屏</button>
+      </div>
+      <p class="muted-text">新分屏沿用所选分屏的当前目录。点击终端切换焦点，拖动分隔线调整大小。</p>
+      <div id="pane-confirm" hidden>
+        <p>
+          关闭分屏
+          <strong id="pane-close-label"></strong>
+          及其中的进程？
+        </p>
+        <div class="dialog-footer">
+          <button id="pane-cancel-close">取消关闭</button>
+          <button id="pane-confirm-close" class="danger">确认关闭分屏</button>
+        </div>
+      </div>
+      <p id="pane-error" class="form-error" role="alert"></p>
     </dialog>
 
     <dialog id="confirm-dialog">

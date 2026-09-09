@@ -60,3 +60,15 @@ class Batch(BaseModel):
     @classmethod
     def clean_group(cls, value: str) -> str:
         return Metadata.clean_group(value)
+
+
+class Split(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pane: str = Field(pattern=r"^%\d+$", max_length=24)
+    direction: Literal["horizontal", "vertical"]
+
+
+class PaneAction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pane: str = Field(pattern=r"^%\d+$", max_length=24)
+    action: Literal["select", "zoom", "restart"]

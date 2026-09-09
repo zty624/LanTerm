@@ -46,7 +46,12 @@ export class SessionStatus {
     group.dataset.signature = signature;
     group.replaceChildren();
     for (const item of items) {
-      const badge = el('span', 'plugin-badge', `${item.name} · ${item.label}`);
+      const multiple = items.filter((other) => other.plugin === item.plugin).length > 1;
+      const badge = el(
+        'span',
+        'plugin-badge',
+        `${item.name}${multiple ? ` ${item.pane}` : ''} · ${item.label}`,
+      );
       badge.dataset.plugin = item.plugin;
       badge.dataset.state = item.state;
       badge.title = item.detail || `${item.name} · ${item.label} (${item.pane})`;

@@ -5,6 +5,7 @@ import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ResourceView } from './monitor.js';
 import { SessionStatus } from './plugins.js';
+import { PaneControls } from './panes.js';
 import { $, el } from './dom.js';
 import './style.css';
 
@@ -36,6 +37,15 @@ const resources = new ResourceView(
   () => state.loggedIn,
 );
 const plugins = new SessionStatus(api, () => state.loggedIn);
+const panes = new PaneControls(
+  api,
+  async () => {
+    await refresh();
+    plugins.refresh();
+    state.term?.focus();
+  },
+  report,
+);
 const sessionView = (items) =>
   items.map(({ activity, ...item }) => ({
     ...item,
@@ -215,7 +225,7 @@ function render() {
     const info = el('span', 'session-info');
     const title = el('strong', '', item.name);
     const detail = document.createElement('small');
-    detail.textContent = `${item.shell} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
+    detail.textContent = `${item.shell}${item.pane_count > 1 ? ` · ${item.pane_count} 个分屏` : ''} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
     const dot = document.createElement('span');
     dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
     info.append(title, detail, plugins.render(item.id));
@@ -252,7 +262,8 @@ function render() {
   $('active-detail').title = item ? `初始目录: ${item.cwd}` : '';
   $('session-actions').hidden = !item || monitoring;
   $('pin-session').textContent = item?.pinned ? '取消置顶' : '置顶';
-  $('restart-session').hidden = item?.status !== 'exited';
+  $('restart-session').hidden = !item?.active_dead;
+  $('restart-session').textContent = item?.pane_count > 1 ? '重启分屏' : '重新启动';
   $('empty-state').hidden = !!item || monitoring;
   $('terminal').hidden = !item || monitoring;
   $('monitor-view').hidden = !monitoring;
@@ -703,6 +714,7 @@ bind('duplicate-session', async () => {
   toast('已按原会话的当前目录和 Shell 创建新会话');
 });
 bind('session-details', () => resources.showSession(state.active));
+bind('show-panes', () => panes.open(state.active));
 bind('batch-mode', () => {
   state.batch = !state.batch;
   if (!state.batch) state.selected.clear();
