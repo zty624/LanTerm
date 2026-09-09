@@ -182,7 +182,6 @@ function overview(data) {
     const node = document.querySelector(`.overview-card[data-key="${item.key}"]`);
     const scope = { cgroup: '当前 cgroup', host: '主机', unavailable: '不可用' }[item.scope];
     text(node.querySelector('.overview-value'), item.value);
-    text(node.querySelector('.overview-scope'), scope);
     text(node.querySelector('.overview-detail'), item.detail);
     node.title = `${scope}${item.shared ? ' · 上级共享配额' : ''}`;
     updateTrend(node.querySelector('.overview-trend'), history, item.key, item.limit);
@@ -190,9 +189,9 @@ function overview(data) {
   $('resource-overview').classList.remove('stale');
   text(
     $('overview-updated'),
-    `${new Date(data.timestamp * 1000).toLocaleTimeString([], { hour12: false })} · 约 3 秒更新`,
+    new Date(data.timestamp * 1000).toLocaleTimeString([], { hour12: false }),
   );
-  $('overview-updated').title = '';
+  $('overview-updated').title = '约每 3 秒更新 · 曲线为最近 6 分钟';
 }
 
 export class ResourceView {
@@ -220,14 +219,12 @@ export class ResourceView {
     this.busy = false;
     this.detailBusy = false;
     this.data = null;
-    $('resource-overview').hidden = false;
     $('resource-overview').classList.remove('stale');
     text($('overview-updated'), '正在读取…');
     $('overview-updated').title = '';
     for (const node of document.querySelectorAll('.overview-card')) {
       text(node.querySelector('.overview-value'), '—');
       text(node.querySelector('.overview-detail'), '正在读取…');
-      text(node.querySelector('.overview-scope'), '');
       node.querySelector('.overview-trend').replaceChildren();
       node.title = '';
     }
@@ -236,7 +233,6 @@ export class ResourceView {
   setVisible(visible) {
     if (this.visible === visible) return;
     this.visible = visible;
-    $('resource-overview').hidden = visible;
     if (visible && this.data) this.render(this.data);
   }
 

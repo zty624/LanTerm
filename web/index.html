@@ -100,6 +100,34 @@
           <button id="batch-close" class="danger-subtle">关闭所选</button>
         </div>
         <div id="session-list" role="list" aria-label="终端会话"></div>
+        <section id="resource-overview" class="resource-overview" aria-label="CPU 和内存概览">
+          <div class="overview-heading">
+            <span>资源概览</span>
+            <span id="overview-updated">正在读取…</span>
+          </div>
+          <div class="overview-cards">
+            <article class="overview-card" data-key="cpu">
+              <div class="overview-numbers">
+                <div class="overview-label">
+                  <span>CPU</span>
+                  <strong class="overview-value">—</strong>
+                </div>
+                <span class="overview-detail">正在读取…</span>
+              </div>
+              <div class="overview-trend"></div>
+            </article>
+            <article class="overview-card" data-key="memory">
+              <div class="overview-numbers">
+                <div class="overview-label">
+                  <span>内存</span>
+                  <strong class="overview-value">—</strong>
+                </div>
+                <span class="overview-detail">正在读取…</span>
+              </div>
+              <div class="overview-trend"></div>
+            </article>
+          </div>
+        </section>
         <div class="sidebar-footer">
           <span class="dot"></span>
           <span id="host-label"></span>
@@ -142,43 +170,6 @@
           <button id="show-monitor" class="monitor-toggle">资源监控</button>
           <button id="fullscreen" class="icon-button" title="全屏" aria-label="全屏">⛶</button>
         </header>
-        <section id="resource-overview" class="resource-overview" aria-label="CPU 和内存概览">
-          <div class="overview-heading">
-            <span>
-              资源概览
-              <small>最近 6 分钟</small>
-            </span>
-            <span id="overview-updated">正在读取…</span>
-          </div>
-          <div class="overview-cards">
-            <article class="overview-card" data-key="cpu">
-              <div class="overview-label">
-                <span>CPU</span>
-                <span class="overview-scope"></span>
-              </div>
-              <div class="overview-main">
-                <div class="overview-numbers">
-                  <strong class="overview-value">—</strong>
-                  <span class="overview-detail">正在读取…</span>
-                </div>
-                <div class="overview-trend"></div>
-              </div>
-            </article>
-            <article class="overview-card" data-key="memory">
-              <div class="overview-label">
-                <span>内存</span>
-                <span class="overview-scope"></span>
-              </div>
-              <div class="overview-main">
-                <div class="overview-numbers">
-                  <strong class="overview-value">—</strong>
-                  <span class="overview-detail">正在读取…</span>
-                </div>
-                <div class="overview-trend"></div>
-              </div>
-            </article>
-          </div>
-        </section>
         <div id="search-bar" class="search-bar" hidden>
           <input id="search-input" aria-label="搜索终端" placeholder="搜索当前缓冲区…" />
           <button id="search-prev" aria-label="上一个结果">↑</button>

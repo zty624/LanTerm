@@ -683,7 +683,7 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
     data.history.push({ timestamp: data.timestamp, cpu, memory });
     await route.fulfill({ json: data });
   });
-  const overview = page.locator('#resource-overview');
+  const overview = page.locator('#sidebar #resource-overview');
   const cpuCard = overview.locator('[data-key="cpu"]');
   const memoryCard = overview.locator('[data-key="memory"]');
   await expect(overview).toBeVisible();
@@ -712,13 +712,20 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
       .toBe(true);
+    if (width === 390) {
+      await expect(overview).not.toBeVisible();
+      await page.locator('#toggle-sidebar').click();
+    }
     await expect(overview).toBeVisible();
     await expect(memoryCard.locator('svg')).toBeVisible();
+    const panel = await overview.boundingBox();
+    const sidebar = await page.locator('#sidebar').boundingBox();
+    expect(panel.x + panel.width).toBeLessThanOrEqual(sidebar.x + sidebar.width);
   }
   await page.screenshot({ path: '.runtime/resource-overview-mobile.png' });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('#show-monitor').click();
-  await expect(overview).not.toBeVisible();
+  await expect(overview).toBeVisible();
   const disk = page.locator('.metric-card[data-key="disk"]');
   await expect(disk.locator('.metric-value')).toHaveText('80.0%');
   await expect(disk).toContainText('可用 200.0 GiB');
