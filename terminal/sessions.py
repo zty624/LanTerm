@@ -94,9 +94,10 @@ class Sessions:
             "#{session_name}\t#{window_id}\t#{window_active}\t#{window_zoomed_flag}"
             "\t#{pane_id}\t#{pane_index}\t#{pane_active}\t#{pane_dead}\t#{pane_pid}"
             "\t#{pane_tty}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}"
+            "\t#{pane_current_command}"
         )
         for line in (await self.scan(["list-panes", "-a", "-F", fmt])).splitlines():
-            fields = line.split("\t")
+            fields = line.split("\t", 14)
             if fields[0] not in items:
                 continue
             (
@@ -114,6 +115,7 @@ class Sessions:
                 rows,
                 x,
                 y,
+                command,
             ) = fields
             items[name]["panes"].append(
                 dict(
@@ -130,6 +132,7 @@ class Sessions:
                     rows=int(rows),
                     x=int(x),
                     y=int(y),
+                    command=command,
                 )
             )
         result = []

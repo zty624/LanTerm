@@ -332,6 +332,65 @@ kbd {
 .plugin-badge[data-state='exited'] {
   color: #88909d;
 }
+.session-panes {
+  display: grid;
+  gap: 4px;
+  margin: 4px 5px 12px 22px;
+  padding-left: 9px;
+  border-left: 1px solid #384750;
+}
+.sidebar-pane {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+.sidebar-pane.active {
+  border-color: #466453;
+  background: #24332e;
+}
+.pane-switch,
+.pane-menu {
+  border: 0;
+  background: transparent;
+}
+.pane-switch {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 8px;
+  text-align: left;
+}
+.pane-menu {
+  padding: 6px;
+  font-size: 20px;
+  line-height: 1;
+}
+.pane-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 12px;
+}
+.pane-number {
+  color: #91a2b3;
+}
+.pane-command {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-focus {
+  margin-left: auto;
+  color: var(--accent);
+  white-space: nowrap;
+  font-size: 11px;
+}
+.sidebar-pane .plugin-badge {
+  padding: 3px 5px;
+  font-size: 11px;
+}
 .dot {
   display: inline-block;
   width: 6px;

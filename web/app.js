@@ -6,7 +6,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ResourceView } from './monitor.js';
 import { SessionStatus } from './plugins.js';
 import { PaneControls } from './panes.js';
-import { $, el } from './dom.js';
+import { $, el, reconcile, text } from './dom.js';
 import './style.css';
 
 const encoder = new TextEncoder();
@@ -39,16 +39,19 @@ const resources = new ResourceView(
 const plugins = new SessionStatus(api, () => state.loggedIn);
 const panes = new PaneControls(
   api,
-  async () => {
+  async (sid) => {
     await refresh();
+    if (sid && sid !== state.active) select(sid);
     plugins.refresh();
     state.term?.focus();
   },
   report,
+  plugins,
 );
 const sessionView = (items) =>
-  items.map(({ activity, ...item }) => ({
+  items.map(({ activity, panes, pid, active_pane, active_dead, ...item }) => ({
     ...item,
+    pane_ids: panes.map((pane) => pane.id),
     activity: $('session-sort').value === 'activity' ? activity : null,
   }));
 let toastTimer;
@@ -124,6 +127,7 @@ function disconnect() {
 function showLogin() {
   state.loggedIn = false;
   plugins.reset([]);
+  panes.reset();
   disconnect();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('workspace').hidden = true;
@@ -188,6 +192,64 @@ function groupOptions() {
   $('group-options').replaceChildren(...names.map((name) => new Option(name, name)));
 }
 
+async function selectPane(sid, pane) {
+  await api(`/sessions/${sid}/panes/action`, 'POST', { pane, action: 'select' });
+  select(sid);
+  await refresh();
+}
+
+function syncPanes() {
+  for (const group of document.querySelectorAll('[data-pane-session]')) {
+    const item = state.sessions.find((item) => item.id === group.dataset.paneSession);
+    if (!item) continue;
+    reconcile(
+      group,
+      item.panes.map((pane) => ({ ...pane, key: pane.id })),
+      (pane) => {
+        const row = el('div', 'sidebar-pane');
+        const button = el('button', 'pane-switch');
+        button.setAttribute('aria-label', `切换到分屏 ${pane.id}`);
+        const heading = el('span', 'pane-heading');
+        heading.append(
+          el('code', 'pane-number', pane.id),
+          el('span', 'pane-command'),
+          el('span', 'pane-focus', '输入'),
+        );
+        button.append(heading, plugins.render(item.id, pane.id));
+        button.addEventListener('click', () => selectPane(item.id, pane.id).catch(report));
+        const menu = el('button', 'pane-menu', '⋯');
+        menu.setAttribute('aria-label', `管理分屏 ${pane.id}`);
+        menu.addEventListener('click', () => panes.open(item.id, pane.id));
+        row.append(button, menu);
+        return row;
+      },
+      (row, pane) => {
+        const current = state.active === item.id && pane.visible && pane.active;
+        row.classList.toggle('active', current);
+        row.querySelector('.pane-switch').setAttribute('aria-current', String(current));
+        row.querySelector('.pane-switch').disabled = !pane.visible;
+        row.querySelector('.pane-menu').disabled = !pane.visible;
+        row.title = pane.visible ? '' : '此分屏位于其他 tmux 窗口，请先切换窗口';
+        row.querySelector('.pane-focus').hidden = !current;
+        text(
+          row.querySelector('.pane-command'),
+          `${pane.dead ? '已退出' : pane.command || item.shell}${pane.visible ? '' : ' · 其他窗口'}`,
+        );
+      },
+    );
+  }
+  const item = active();
+  const focused = item?.panes.find((pane) => pane.id === item.active_pane);
+  if (state.view === 'terminal' && item)
+    text(
+      $('active-detail'),
+      `${item.pane_count > 1 ? `${focused.id} · ` : ''}${focused.command || item.shell} · ${item.cwd}`,
+    );
+  $('restart-session').hidden = !item?.active_dead;
+  $('restart-session').textContent = item?.pane_count > 1 ? '重启分屏' : '重新启动';
+  panes.sync(state.sessions);
+}
+
 function render() {
   groupOptions();
   const ids = new Set(state.sessions.map((item) => item.id));
@@ -225,10 +287,11 @@ function render() {
     const info = el('span', 'session-info');
     const title = el('strong', '', item.name);
     const detail = document.createElement('small');
-    detail.textContent = `${item.shell}${item.pane_count > 1 ? ` · ${item.pane_count} 个分屏` : ''} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
+    detail.textContent = `${item.shell}${item.panes.length > 1 ? ` · ${item.panes.length} 个分屏` : ''} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
     const dot = document.createElement('span');
     dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
-    info.append(title, detail, plugins.render(item.id));
+    info.append(title, detail);
+    if (item.panes.length === 1) info.append(plugins.render(item.id, item.active_pane));
     if (item.tags.length) {
       const tags = el('span', 'session-tags');
       for (const name of item.tags.slice(0, 3)) {
@@ -241,6 +304,13 @@ function render() {
     button.addEventListener('dblclick', () => sessionDialog(item));
     row.append(button);
     fragment.append(row);
+    if (item.panes.length > 1) {
+      const group = el('div', 'session-panes');
+      group.dataset.paneSession = item.id;
+      group.setAttribute('role', 'group');
+      group.setAttribute('aria-label', `${item.name} 的分屏`);
+      fragment.append(group);
+    }
   }
   if (!visible.length) {
     const empty = el('p', 'monitor-note', '没有匹配的会话');
@@ -272,6 +342,7 @@ function render() {
   document.body.classList.toggle('resources-open', monitoring);
   if (monitoring) $('search-bar').hidden = true;
   document.title = monitoring ? '资源监控 — LanTerm' : item ? `${item.name} — LanTerm` : 'LanTerm';
+  syncPanes();
 }
 
 async function refresh() {
@@ -290,7 +361,7 @@ async function refresh() {
       select(state.sessions[0].id);
     } else if (changed) {
       render();
-    }
+    } else syncPanes();
   } finally {
     state.refreshing = false;
   }
@@ -714,7 +785,7 @@ bind('duplicate-session', async () => {
   toast('已按原会话的当前目录和 Shell 创建新会话');
 });
 bind('session-details', () => resources.showSession(state.active));
-bind('show-panes', () => panes.open(state.active));
+bind('show-panes', () => panes.open(state.active, null));
 bind('batch-mode', () => {
   state.batch = !state.batch;
   if (!state.batch) state.selected.clear();
@@ -750,9 +821,13 @@ bind('close-session', () => {
   $('confirm-dialog').showModal();
 });
 bind('restart-session', async () => {
-  await api(`/sessions/${state.active}/restart`, 'POST');
+  const item = active();
+  await api(`/sessions/${item.id}/panes/action`, 'POST', {
+    pane: item.active_pane,
+    action: 'restart',
+  });
   await refresh();
-  connect();
+  state.term?.focus();
 });
 bind('show-paste', () => {
   $('paste-text').value = '';
@@ -857,7 +932,7 @@ setInterval(() => {
     refresh().catch((error) => {
       if (error.status !== 401) connection('服务暂不可达', 'waiting');
     });
-}, 5000);
+}, 1000);
 setInterval(() => {
   if (!state.loggedIn || document.hidden) return;
   if ($('details-dialog').open) resources.refreshSession();

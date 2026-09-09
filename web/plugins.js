@@ -22,15 +22,18 @@ export class SessionStatus {
     this.update();
   }
 
-  render(sid) {
+  render(sid, pane) {
     const group = el('span', 'plugin-badges');
     group.dataset.pluginSession = sid;
+    if (pane) group.dataset.pluginPane = pane;
     this.fill(group, sid);
     return group;
   }
 
   fill(group, sid) {
-    const items = this.data[sid] || [];
+    const items = (this.data[sid] || []).filter(
+      (item) => !group.dataset.pluginPane || item.pane === group.dataset.pluginPane,
+    );
     const signature = JSON.stringify(
       items.map(({ plugin, name, state, label, detail, pane, pid }) => ({
         plugin,

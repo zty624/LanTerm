@@ -77,6 +77,36 @@ async def test_unknown_without_compatible_events_and_title_fallback(server):
         await ws.send(b"q")
 
 
+async def test_respawn_and_reused_pane_number_do_not_inherit_codex_status(server):
+    await server.login()
+    item = await server.create("old agent", "bash")
+    async with server.websocket(item["id"]) as ws:
+        await command(ws, "exec " + shlex.join([sys.executable, str(DRIVER)]), b"fixture:ready")
+        await status(server, item["id"], "waiting_input")
+        await ws.send(b"q")
+        await status(server, item["id"], "exited")
+        response = await server.client.post(f"/api/sessions/{item['id']}/restart")
+        response.raise_for_status()
+        async with asyncio.timeout(5):
+            while (
+                (await server.client.get("/api/plugins/status")).json()["sessions"].get(item["id"])
+            ):
+                await asyncio.sleep(0.1)
+        await command(ws, shlex.join([sys.executable, str(DRIVER)]), b"fixture:ready")
+        await status(server, item["id"], "waiting_input")
+    response = await server.client.delete(f"/api/sessions/{item['id']}")
+    response.raise_for_status()
+    fresh = await server.create("fresh shell", "bash")
+    assert fresh["active_pane"] == item["active_pane"]
+    async with asyncio.timeout(5):
+        while True:
+            data = (await server.client.get("/api/plugins/status")).json()["sessions"]
+            if item["id"] not in data:
+                assert not data.get(fresh["id"])
+                break
+            await asyncio.sleep(0.1)
+
+
 async def test_two_codex_processes_in_same_directory_and_paused_agent(server):
     await server.login()
     first = await server.create("one", "bash")

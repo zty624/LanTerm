@@ -277,6 +277,93 @@ test('tmux splits support independent input, mouse resizing, Vim and reconnect',
   expect(errors).toEqual([]);
 });
 
+test('pane sidebar keeps Codex badges aligned and rejects a stale close target', async ({
+  page,
+  service,
+}) => {
+  const errors = [];
+  let sockets = 0;
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('websocket', () => sockets++);
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Parallel agents');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  const item = (await (await page.request.get(service.url + '/api/sessions')).json())[0];
+  const first = item.active_pane;
+  const quote = (text) => "'" + text.replaceAll("'", "'\\''") + "'";
+  const driver = [resolve('.venv/bin/python'), resolve('tests/fixtures/codex_process.py')]
+    .map(quote)
+    .join(' ');
+  await run(page, driver);
+  await expect(page.locator('.plugin-badge')).toHaveText('Codex · 等待输入');
+  await page.locator('#show-panes').click();
+  await page.getByRole('button', { name: '左右分屏', exact: true }).click();
+  await expect(page.locator('#pane-dialog')).not.toBeVisible();
+  const listing = async () =>
+    (await page.request.get(`${service.url}/api/sessions/${item.id}/panes`)).json();
+  const right = (await listing()).active;
+  await run(page, driver);
+  const rows = page.locator(`[data-pane-session="${item.id}"]`);
+  const leftRow = rows.locator(`[data-key="${first}"]`);
+  const rightRow = rows.locator(`[data-key="${right}"]`);
+  await expect
+    .poll(async () => {
+      const result = await (await page.request.get(service.url + '/api/plugins/status')).json();
+      return result.sessions[item.id]?.map(({ pane, state }) => ({ pane, state }));
+    })
+    .toEqual([
+      { pane: first, state: 'waiting_input' },
+      { pane: right, state: 'waiting_input' },
+    ]);
+  await expect(rightRow.locator('.plugin-badge')).toHaveText('Codex · 等待输入');
+  const send = (pane, key) =>
+    exec('tmux', ['-S', join(service.folder, 'tmux.sock'), 'send-keys', '-t', pane, key]);
+  await send(first, 'w');
+  await expect(leftRow.locator('.plugin-badge')).toHaveText('Codex · Working · 工作中');
+  await expect(rightRow.locator('.plugin-badge')).toHaveText('Codex · 等待输入');
+  await leftRow.locator('.pane-switch').click();
+  await expect.poll(async () => (await listing()).active).toBe(first);
+  await page.keyboard.press('a');
+  await expect(leftRow.locator('.plugin-badge')).toHaveText('Codex · 等待确认 / 输入');
+  await expect(leftRow.locator('.pane-focus')).toBeVisible();
+  await expect(rightRow.locator('.pane-focus')).not.toBeVisible();
+  await mkdir('.runtime', { recursive: true });
+  await page.screenshot({ path: '.runtime/pane-status-desktop.png' });
+  await rightRow.locator('.pane-menu').click();
+  await expect(page.locator('#pane-target')).toHaveValue(right);
+  await expect(page.locator('#pane-status .plugin-badge')).toHaveText('Codex · 等待输入');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: '.runtime/pane-status-mobile.png' });
+  await page.getByRole('button', { name: '关闭此分屏', exact: true }).click();
+  const removed = await page.request.delete(
+    `${service.url}/api/sessions/${item.id}/panes/${encodeURIComponent(right)}`,
+  );
+  expect(removed.ok()).toBeTruthy();
+  await expect(page.locator('#pane-target')).toHaveValue('');
+  await expect(page.locator('#pane-confirm')).not.toBeVisible();
+  await expect(page.getByRole('button', { name: '左右分屏', exact: true })).toBeDisabled();
+  expect((await listing()).panes.map((pane) => pane.id)).toEqual([first]);
+  await page.locator('#pane-target').selectOption(first);
+  await expect(page.locator('#pane-status .plugin-badge')).toHaveText('Codex · 等待确认 / 输入');
+  await page.getByRole('button', { name: '关闭分屏面板', exact: true }).click();
+  await send(first, 'q');
+  await expect(page.locator('#session-list .plugin-badge')).toHaveText('Codex · 已退出');
+  await run(page, 'exit');
+  await expect(page.locator('#restart-session')).toBeVisible();
+  await page.locator('#restart-session').click();
+  await expect(page.locator('#restart-session')).not.toBeVisible();
+  await expect(page.locator('#session-list .plugin-badge')).toHaveCount(0);
+  await run(page, "printf 'restarted:%s\\n' ready");
+  await expect(page.locator('.xterm-rows')).toContainText('restarted:ready');
+  expect(sockets).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test('Codex plugin updates inactive sessions, survives restart and sends Ctrl+/', async ({
   page,
   service,

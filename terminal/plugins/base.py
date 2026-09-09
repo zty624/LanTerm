@@ -10,6 +10,10 @@ class Pane:
     dead: bool
     tty: str
 
+    @property
+    def key(self) -> tuple[str, str, int]:
+        return self.session, self.id, self.pid
+
 
 class StatusPlugin(Protocol):
     id: str
