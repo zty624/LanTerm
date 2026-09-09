@@ -157,6 +157,44 @@ function updateGpu(node, gpu) {
   node.title = gpu.uuid;
 }
 
+function overview(data) {
+  const { cpu, memory, history } = data;
+  const ratio = memory.limit && memory.used !== null ? (memory.used / memory.limit) * 100 : null;
+  const values = [
+    {
+      key: 'cpu',
+      scope: cpu.scope,
+      value: cpu.percent === null && cpu.scope !== 'unavailable' ? '采样中' : percent(cpu.percent),
+      detail: `${num(cpu.cores_used, 2)} / ${num(cpu.cores_limit, 2)} 核`,
+      limit: 100,
+      shared: cpu.shared_limit,
+    },
+    {
+      key: 'memory',
+      scope: memory.scope,
+      value: bytes(memory.used),
+      detail: memory.limit === null ? '上限未知' : `/ ${bytes(memory.limit)} · ${percent(ratio)}`,
+      limit: memory.limit,
+      shared: memory.shared_limit,
+    },
+  ];
+  for (const item of values) {
+    const node = document.querySelector(`.overview-card[data-key="${item.key}"]`);
+    const scope = { cgroup: '当前 cgroup', host: '主机', unavailable: '不可用' }[item.scope];
+    text(node.querySelector('.overview-value'), item.value);
+    text(node.querySelector('.overview-scope'), scope);
+    text(node.querySelector('.overview-detail'), item.detail);
+    node.title = `${scope}${item.shared ? ' · 上级共享配额' : ''}`;
+    updateTrend(node.querySelector('.overview-trend'), history, item.key, item.limit);
+  }
+  $('resource-overview').classList.remove('stale');
+  text(
+    $('overview-updated'),
+    `${new Date(data.timestamp * 1000).toLocaleTimeString([], { hour12: false })} · 约 3 秒更新`,
+  );
+  $('overview-updated').title = '';
+}
+
 export class ResourceView {
   constructor(api, getSessions, select, allowed) {
     this.api = api;
@@ -174,27 +212,40 @@ export class ResourceView {
 
   reset() {
     this.generation += 1;
-    this.setVisible(false);
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.visible = false;
     this.controller?.abort();
     this.controller = null;
     this.busy = false;
     this.detailBusy = false;
     this.data = null;
+    $('resource-overview').hidden = false;
+    $('resource-overview').classList.remove('stale');
+    text($('overview-updated'), '正在读取…');
+    $('overview-updated').title = '';
+    for (const node of document.querySelectorAll('.overview-card')) {
+      text(node.querySelector('.overview-value'), '—');
+      text(node.querySelector('.overview-detail'), '正在读取…');
+      text(node.querySelector('.overview-scope'), '');
+      node.querySelector('.overview-trend').replaceChildren();
+      node.title = '';
+    }
   }
 
   setVisible(visible) {
     if (this.visible === visible) return;
     this.visible = visible;
-    clearTimeout(this.timer);
-    if (visible) this.refresh();
+    $('resource-overview').hidden = visible;
+    if (visible && this.data) this.render(this.data);
   }
 
   resume() {
-    if (this.visible) this.refresh();
+    this.refresh();
   }
 
   async refresh() {
-    if (this.busy || !this.allowed() || !this.visible || document.hidden) return;
+    if (this.busy || !this.allowed() || document.hidden) return;
     clearTimeout(this.timer);
     this.busy = true;
     const generation = this.generation;
@@ -206,20 +257,23 @@ export class ResourceView {
       const data = await this.api('/metrics', 'GET', undefined, controller.signal);
       if (!this.allowed() || generation !== this.generation) return;
       this.data = data;
-      this.render(data);
+      overview(data);
+      if (this.visible) this.render(data);
       $('monitor-error').textContent = '';
     } catch (error) {
       if (generation !== this.generation) return;
       $('monitor-error').textContent =
         `统计更新失败：${error.name === 'AbortError' ? '请求超时' : error.message}${this.data ? '。保留上次采样，稍后自动重试。' : '。稍后自动重试。'}`;
+      $('resource-overview').classList.add('stale');
+      text($('overview-updated'), this.data ? '更新失败 · 保留上次采样' : '暂时无法读取');
+      $('overview-updated').title = $('monitor-error').textContent;
     } finally {
       clearTimeout(timeout);
       if (generation === this.generation) {
         this.busy = false;
         this.controller = null;
         $('monitor-refresh').disabled = false;
-        if (this.visible && this.allowed() && !document.hidden)
-          this.timer = setTimeout(() => this.refresh(), 3000);
+        if (this.allowed() && !document.hidden) this.timer = setTimeout(() => this.refresh(), 3000);
       }
     }
   }

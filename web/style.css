@@ -822,6 +822,101 @@ textarea {
   border-color: #3a5145;
   background: #222f28;
 }
+/* CPU and memory stay visible alongside the terminal. */
+.resource-overview {
+  flex-shrink: 0;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #151a21;
+}
+.overview-heading,
+.overview-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.overview-heading {
+  margin-bottom: 8px;
+  color: #c3ceda;
+  font-size: 12px;
+}
+.overview-heading small {
+  margin-left: 8px;
+  color: #8696a7;
+  font-size: 11px;
+}
+#overview-updated {
+  color: #8696a7;
+  font-size: 11px;
+}
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.overview-card {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #2f3b49;
+  border-radius: 8px;
+  background: linear-gradient(120deg, #1d2732, #192129);
+}
+.overview-label {
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: #a9ccf0;
+}
+.overview-scope {
+  color: #91a3b4;
+  font-size: 11px;
+}
+.overview-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(50px, 38%);
+  align-items: center;
+  gap: 12px;
+}
+.overview-numbers {
+  min-width: 0;
+}
+.overview-value {
+  display: block;
+  font:
+    550 20px/1.2 ui-monospace,
+    monospace;
+  font-variant-numeric: tabular-nums;
+  color: #e1ebf6;
+}
+.overview-detail {
+  display: block;
+  margin-top: 4px;
+  color: #9dadbd;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.overview-trend {
+  min-width: 0;
+  height: 38px;
+  background: linear-gradient(transparent calc(100% - 1px), #344251 1px);
+}
+.overview-card[data-key='memory'] {
+  background: linear-gradient(120deg, #1f2c2a, #192129);
+}
+.overview-card[data-key='memory'] .overview-label {
+  color: #a0dbb9;
+}
+.overview-card[data-key='memory'] .sparkline polyline {
+  stroke: #8fdfb1;
+}
+.resource-overview.stale #overview-updated {
+  color: #e9bd84;
+}
+.resource-overview.stale .overview-value,
+.resource-overview.stale .overview-trend {
+  opacity: 0.6;
+}
 /* Resource dashboard */
 .monitor-view {
   flex: 1;
@@ -1358,6 +1453,28 @@ textarea {
   }
 }
 @media (max-width: 700px) {
+  .resource-overview {
+    padding: 8px 10px 10px;
+  }
+  .overview-cards {
+    gap: 8px;
+  }
+  .overview-card {
+    padding: 8px 9px;
+  }
+  .overview-main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+  .overview-value {
+    font-size: 18px;
+  }
+  .overview-trend {
+    height: 24px;
+  }
+  .overview-heading small {
+    display: none;
+  }
   #sidebar {
     position: absolute;
     inset: 0 auto 0 0;

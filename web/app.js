@@ -386,6 +386,7 @@ async function enter() {
   if (state.sessions.length)
     select(state.sessions.find((item) => item.id === saved)?.id || state.sessions[0].id);
   else render();
+  resources.resume();
 }
 
 function fit() {

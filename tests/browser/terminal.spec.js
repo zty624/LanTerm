@@ -633,13 +633,23 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
   const base = await (await page.request.get(service.url + '/api/metrics')).json();
   const gib = 2 ** 30;
   let utilization = 75;
+  let cpu = 25;
+  let memory = 8 * gib;
+  let failed = false;
   let calls = 0;
   await page.route('**/api/metrics', async (route) => {
     calls += 1;
+    if (failed) return route.abort();
     const data = structuredClone(base);
     data.timestamp = Date.now() / 1000;
-    data.cpu = { ...data.cpu, percent: 25, cores_used: 2, cores_limit: 8 };
-    data.memory = { ...data.memory, used: 8 * gib, limit: 32 * gib };
+    data.cpu = {
+      ...data.cpu,
+      scope: 'cgroup',
+      percent: cpu,
+      cores_used: cpu * 0.08,
+      cores_limit: 8,
+    };
+    data.memory = { ...data.memory, scope: 'cgroup', used: memory, limit: 32 * gib };
     data.disk = {
       path: service.folder,
       used: 800 * gib,
@@ -665,13 +675,50 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
         },
       ],
     };
-    data.history = [
-      { timestamp: data.timestamp - 3, cpu: 20, memory: 7 * gib },
-      { timestamp: data.timestamp, cpu: 25, memory: 8 * gib },
-    ];
+    data.history = Array.from({ length: 12 }, (_, index) => ({
+      timestamp: data.timestamp - (12 - index) * 30,
+      cpu: 18 + 6 * Math.sin(index),
+      memory: (6 + index * 0.15) * gib,
+    }));
+    data.history.push({ timestamp: data.timestamp, cpu, memory });
     await route.fulfill({ json: data });
   });
+  const overview = page.locator('#resource-overview');
+  const cpuCard = overview.locator('[data-key="cpu"]');
+  const memoryCard = overview.locator('[data-key="memory"]');
+  await expect(overview).toBeVisible();
+  await expect(page.locator('#monitor-view')).not.toBeVisible();
+  await expect(cpuCard.locator('.overview-value')).toHaveText('25.0%');
+  await expect(cpuCard.locator('.overview-detail')).toHaveText('2.00 / 8.00 核');
+  await expect(memoryCard.locator('.overview-value')).toHaveText('8.0 GiB');
+  await expect(memoryCard.locator('.overview-detail')).toHaveText('/ 32.0 GiB · 25.0%');
+  await expect(cpuCard.locator('svg')).toBeVisible();
+  await expect(memoryCard.locator('svg')).toBeVisible();
+  await page.locator('.xterm-helper-textarea').focus();
+  await page.keyboard.type("printf 'overview:%s\\n' intact");
+  const size = await page.locator('#terminal-size').textContent();
+  cpu = 50;
+  memory = 12 * gib;
+  await expect(cpuCard.locator('.overview-value')).toHaveText('50.0%');
+  await expect(memoryCard.locator('.overview-value')).toHaveText('12.0 GiB');
+  await expect(page.locator('.xterm-helper-textarea')).toBeFocused();
+  expect(await page.locator('#terminal-size').textContent()).toBe(size);
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.xterm-rows')).toContainText('overview:intact');
+  await mkdir('.runtime', { recursive: true });
+  await page.screenshot({ path: '.runtime/resource-overview-desktop.png' });
+  for (const width of [1100, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+      .toBe(true);
+    await expect(overview).toBeVisible();
+    await expect(memoryCard.locator('svg')).toBeVisible();
+  }
+  await page.screenshot({ path: '.runtime/resource-overview-mobile.png' });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('#show-monitor').click();
+  await expect(overview).not.toBeVisible();
   const disk = page.locator('.metric-card[data-key="disk"]');
   await expect(disk.locator('.metric-value')).toHaveText('80.0%');
   await expect(disk).toContainText('可用 200.0 GiB');
@@ -717,11 +764,23 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
     node.scrollTop = 0;
   });
   await page.screenshot({ path: '.runtime/monitor-populated.png' });
-  // A hidden resource view stops polling, while the selected terminal stays connected.
+  // The terminal overview keeps sampling; failures preserve the last values with a notice.
   await page.locator('#show-monitor').click();
+  await expect(overview).toBeVisible();
+  cpu = 70;
+  await expect(cpuCard.locator('.overview-value')).toHaveText('70.0%');
+  failed = true;
+  await expect(page.locator('#overview-updated')).toHaveText('更新失败 · 保留上次采样');
+  await expect(cpuCard.locator('.overview-value')).toHaveText('70.0%');
+  failed = false;
+  cpu = 35;
+  await expect(cpuCard.locator('.overview-value')).toHaveText('35.0%');
+  await expect(overview).not.toHaveClass(/stale/);
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await page.locator('#logout').click();
+  await expect(page.locator('#login-screen')).toBeVisible();
   const stoppedAt = calls;
   await page.waitForTimeout(3400);
   expect(calls).toBe(stoppedAt);
-  await expect(page.locator('#connection-status')).toHaveText('已连接');
   expect(errors).toEqual([]);
 });
