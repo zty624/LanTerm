@@ -51,6 +51,7 @@ systemctl --user stop lan-terminal
 | 搜索 | `Ctrl+Shift+F` |
 | 控制键 | 顶部“按键”，包括 Ctrl+W、Ctrl+T、Ctrl+N、Ctrl+/ |
 | 分屏 | 顶部“分屏”，支持左右 / 上下分屏、切换、放大、重启和关闭 |
+| 右键菜单 | 终端内使用 tmux 菜单；`Shift` + 右键打开浏览器菜单 |
 | 历史 | 顶部“历史”，最近 20,000 行；tmux 复制模式按 `Esc` / `q` 返回 |
 | 字号 | 右下角 `−` / `＋`，默认 16px，可调 10–28px |
 

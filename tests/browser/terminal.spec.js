@@ -121,6 +121,48 @@ async function run(page, command) {
   await page.keyboard.press('Enter');
 }
 
+test('terminal right click opens tmux menu and preserves browser menu outside', async ({
+  page,
+  service,
+  browserName,
+}) => {
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Mouse input');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await run(page, "printf 'mouse:%s\\n' ready");
+  await expect(page.locator('.xterm-rows')).toContainText('mouse:ready');
+  await page.evaluate(() => {
+    window.contextMenus = [];
+    document.addEventListener('contextmenu', (event) => window.contextMenus.push(event), true);
+  });
+  const menus = () =>
+    page.evaluate(() =>
+      window.contextMenus.map((event) => ({
+        prevented: event.defaultPrevented,
+        shift: event.shiftKey,
+      })),
+    );
+  const screen = page.locator('.xterm-screen');
+  await screen.click({ button: 'right', delay: 80, position: { x: 120, y: 150 } });
+  await expect(page.locator('.xterm-rows')).toContainText('Horizontal Split');
+  await expect.poll(menus).toEqual([{ prevented: true, shift: false }]);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.xterm-rows')).not.toContainText('Horizontal Split');
+  await screen.click({ button: 'right', modifiers: ['Shift'], position: { x: 120, y: 150 } });
+  await expect(page.locator('.xterm-rows')).not.toContainText('Horizontal Split');
+  if (browserName === 'firefox') expect(await menus()).toHaveLength(1);
+  else expect((await menus()).at(-1)).toEqual({ prevented: false, shift: true });
+  await page.keyboard.press('Escape');
+  await page.locator('#filter-query').click({ button: 'right' });
+  expect((await menus()).at(-1)).toEqual({
+    prevented: false,
+    shift: false,
+  });
+  await page.keyboard.press('Escape');
+});
+
 test('tmux splits support independent input, mouse resizing, Vim and reconnect', async ({
   page,
   service,

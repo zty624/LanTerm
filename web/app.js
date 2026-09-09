@@ -820,6 +820,9 @@ function zoom(delta) {
 }
 bind('zoom-out', () => zoom(-1));
 bind('zoom-in', () => zoom(1));
+$('terminal').addEventListener('contextmenu', (event) => {
+  if (!event.shiftKey) event.preventDefault();
+});
 document.addEventListener('keydown', (event) => {
   if (!state.loggedIn || document.querySelector('dialog[open]')) return;
   if (event.ctrlKey && event.shiftKey && event.code === 'KeyK') {
