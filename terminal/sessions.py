@@ -13,6 +13,16 @@ from terminal.config import ROOT, Config, available_shells
 
 META = ("name", "shell", "cwd", "group", "tags", "pinned", "note")
 LOG = logging.getLogger(__name__)
+TERM_HINTS = (
+    "KITTY_PID",
+    "KITTY_WINDOW_ID",
+    "KONSOLE_VERSION",
+    "VTE_VERSION",
+    "TERMINAL_NAME",
+    "LC_TERMINAL",
+    "LC_TERMINAL_VERSION",
+    "CTX_BACKEND",
+)
 
 
 class SessionError(RuntimeError):
@@ -23,10 +33,27 @@ class SessionError(RuntimeError):
 
 def child_env() -> dict[str, str]:
     env = os.environ.copy()
-    for key in ("TMUX", "TMUX_PANE", "LAN_TERMINAL_PASSWORD"):
+    for key in (
+        "TMUX",
+        "TMUX_PANE",
+        "LAN_TERMINAL_PASSWORD",
+        "TERM_PROGRAM",
+        "TERM_PROGRAM_VERSION",
+        *TERM_HINTS,
+    ):
         env.pop(key, None)
     env.update(TERM="xterm-256color", COLORTERM="truecolor")
     return env
+
+
+def shell_command(shell: str) -> list[str]:
+    # A persistent tmux server may still hold hints from an older launcher.
+    return [
+        "env",
+        *[arg for key in TERM_HINTS for arg in ("-u", key)],
+        available_shells()[shell],
+        "-l",
+    ]
 
 
 def directory(cwd: str) -> Path:
@@ -195,8 +222,7 @@ class Sessions:
                     "30",
                     "-e",
                     f"LAN_TERMINAL_SESSION={sid}",
-                    shells[shell],
-                    "-l",
+                    *shell_command(shell),
                 ]
             )
             await self.metadata(sid, dict(name=name, shell=shell, cwd=str(path), **options))
@@ -267,6 +293,7 @@ class Sessions:
                     item["active_pane"],
                     "-e",
                     f"LAN_TERMINAL_SESSION={sid}",
+                    *shell_command(item["shell"]),
                 ]
             )
             return await self.get(sid)

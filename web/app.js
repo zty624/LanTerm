@@ -1,5 +1,6 @@
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { ImageAddon } from '@xterm/addon-image';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -400,6 +401,17 @@ function fit() {
   if (state.term) $('terminal-size').textContent = `${state.term.cols} × ${state.term.rows}`;
 }
 
+function terminalSize(term) {
+  const rect = term.element.querySelector('.xterm-screen').getBoundingClientRect();
+  // Match xterm's integer cell-size reports before tmux draws its first image.
+  return {
+    cols: term.cols,
+    rows: term.rows,
+    width: Math.min(65535, Math.round(rect.width / term.cols) * term.cols),
+    height: Math.min(65535, Math.round(rect.height / term.rows) * term.rows),
+  };
+}
+
 function sendControl(value) {
   if (state.ws?.readyState === WebSocket.OPEN) state.ws.send(JSON.stringify(value));
 }
@@ -479,6 +491,7 @@ function connect() {
   term.loadAddon(state.search);
   term.loadAddon(new Unicode11Addon());
   term.unicode.activeVersion = '11';
+  term.loadAddon(new ImageAddon({ iipSupport: false, storageLimit: 32, pixelLimit: 4194304 }));
   term.loadAddon(
     new WebLinksAddon((event, uri) => {
       event.preventDefault();
@@ -492,8 +505,7 @@ function connect() {
   $('font-size').textContent = `${fontSize}px`;
   const url = new URL(`ws/${state.active}`, location.href);
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  url.searchParams.set('cols', Math.min(500, Math.max(10, term.cols)));
-  url.searchParams.set('rows', Math.min(200, Math.max(2, term.rows)));
+  for (const [key, value] of Object.entries(terminalSize(term))) url.searchParams.set(key, value);
   const ws = new WebSocket(url);
   state.ws = ws;
   ws.binaryType = 'arraybuffer';
@@ -539,8 +551,7 @@ function connect() {
   term.onResize(({ cols, rows }) => {
     sendControl({
       type: 'resize',
-      cols: Math.min(500, Math.max(10, cols)),
-      rows: Math.min(200, Math.max(2, rows)),
+      ...terminalSize(term),
     });
     $('terminal-size').textContent = `${cols} × ${rows}`;
   });

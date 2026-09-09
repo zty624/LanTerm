@@ -195,7 +195,7 @@ async def test_invalid_messages_and_input_validation(server):
 
 
 async def test_login_rate_limit(server):
-    async with httpx.AsyncClient(base_url=server.url) as client:
+    async with httpx.AsyncClient(base_url=server.url, trust_env=False) as client:
         for _ in range(8):
             assert (await client.post("/api/login", json={"password": "wrong"})).status_code == 401
         assert (await client.post("/api/login", json={"password": "wrong"})).status_code == 429

@@ -64,7 +64,9 @@ async def server():
                 await asyncio.sleep(0.01)
         url = f"http://127.0.0.1:{port}"
         try:
-            async with httpx.AsyncClient(base_url=url, headers={"Origin": url}) as client:
+            async with httpx.AsyncClient(
+                base_url=url, headers={"Origin": url}, trust_env=False
+            ) as client:
                 yield Server(config, url, app, client)
         finally:
             try:

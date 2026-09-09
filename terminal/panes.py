@@ -1,7 +1,6 @@
 import subprocess
 
-from terminal.config import available_shells
-from terminal.sessions import SessionError, Sessions
+from terminal.sessions import SessionError, Sessions, shell_command
 
 MAX_PANES = 8
 
@@ -49,8 +48,7 @@ class Panes:
                         "-P",
                         "-F",
                         "#{pane_id}",
-                        available_shells()[item["shell"]],
-                        "-l",
+                        *shell_command(item["shell"]),
                     ]
                 )
             except subprocess.CalledProcessError as exc:
@@ -69,7 +67,7 @@ class Panes:
 
     async def action(self, sid: str, pid: str, action: str) -> dict:
         async with self.sessions.lock:
-            _, pane = await self.target(sid, pid)
+            item, pane = await self.target(sid, pid)
             if action == "select":
                 await self.sessions.run(["select-pane", "-t", pid])
             elif action == "zoom":
@@ -86,6 +84,7 @@ class Panes:
                         pid,
                         "-e",
                         f"LAN_TERMINAL_SESSION={sid}",
+                        *shell_command(item["shell"]),
                     ]
                 )
             else:

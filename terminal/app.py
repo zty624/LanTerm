@@ -69,7 +69,8 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
                 "X-Frame-Options": "DENY",
                 "Referrer-Policy": "no-referrer",
                 "Content-Security-Policy": (
-                    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; "
+                    "style-src 'self' 'unsafe-inline'; "
                     "connect-src 'self'; img-src 'self' data:; font-src 'self'; "
                     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
                 ),
@@ -219,6 +220,8 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
         sid: str,
         cols: Annotated[int, Field(ge=10, le=500)] = 120,
         rows: Annotated[int, Field(ge=2, le=200)] = 30,
+        width: Annotated[int, Field(ge=0, le=65535)] = 0,
+        height: Annotated[int, Field(ge=0, le=65535)] = 0,
     ):
         if not auth.valid(ws):
             await ws.close(1008)
@@ -235,7 +238,7 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
         token = ws.cookies[config.cookie]
         auth.sockets[token].add(ws)
         try:
-            await Terminal(sessions, sid, ws, cols, rows).run()
+            await Terminal(sessions, sid, ws, cols, rows, width, height).run()
         finally:
             auth.sockets[token].discard(ws)
             if not auth.sockets[token]:

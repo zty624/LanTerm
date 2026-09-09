@@ -73,6 +73,16 @@ tmux -S "$state_dir/tmux.sock" attach -t lt-实际ID
 
 LanTerm 使用独立 tmux socket 和配置。同一会话的多个浏览器共享输入，最后一次窗口调整决定终端尺寸。
 
+## 终端图片
+
+支持 Sixel 图片，需要 tmux 编译时启用 Sixel（通常为 3.4+）。用 chafa 预览图片：
+
+```bash
+chafa -f sixels --passthrough none image.png
+```
+
+`--passthrough none` 让 tmux 保存并重绘图片，适用于分屏和刷新重连。旧会话若继承了 Kitty 等终端的环境变量，显式指定格式可避免误判。未启用 Sixel 的 tmux 可用 `chafa -f symbols image.png` 显示字符画；暂不支持 Kitty 图片协议。
+
 ## 开发
 
 ```bash

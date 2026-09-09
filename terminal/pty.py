@@ -24,6 +24,8 @@ class Resize(BaseModel):
     type: Literal["resize"]
     cols: int = Field(ge=10, le=500)
     rows: int = Field(ge=2, le=200)
+    width: int = Field(default=0, ge=0, le=65535)
+    height: int = Field(default=0, ge=0, le=65535)
 
 
 class Ack(BaseModel):
@@ -55,20 +57,31 @@ async def ready(fd: int, write: bool) -> None:
 class Terminal:
     """A browser gets a PTY-backed tmux client, never ownership of the shell."""
 
-    def __init__(self, sessions: Sessions, sid: str, ws: WebSocket, cols: int, rows: int):
+    def __init__(
+        self,
+        sessions: Sessions,
+        sid: str,
+        ws: WebSocket,
+        cols: int,
+        rows: int,
+        width: int,
+        height: int,
+    ):
         self.sessions = sessions
         self.sid = sid
         self.ws = ws
         self.cols = cols
         self.rows = rows
+        self.width = width
+        self.height = height
         self.pending = 0
         self.flow = asyncio.Event()
         self.flow.set()
         self.fd = -1
         self.queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=128)
 
-    def resize(self, cols: int, rows: int) -> None:
-        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+    def resize(self, cols: int, rows: int, width: int, height: int) -> None:
+        fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, width, height))
 
     async def output(self) -> None:
         while True:
@@ -115,7 +128,7 @@ class Terminal:
                 await self.ws.close(1008, "Invalid terminal control message")
                 return
             if event.type == "resize":
-                self.resize(event.cols, event.rows)
+                self.resize(event.cols, event.rows, event.width, event.height)
                 continue
             if event.size > self.pending:
                 await self.ws.close(1008, "Invalid acknowledgement")
@@ -150,11 +163,13 @@ class Terminal:
         try:
             try:
                 os.set_blocking(self.fd, False)
-                self.resize(self.cols, self.rows)
+                self.resize(self.cols, self.rows, self.width, self.height)
                 proc = await asyncio.create_subprocess_exec(
                     sys.executable,
                     str(ROOT / "terminal/attach.py"),
                     *self.sessions.cmd,
+                    "-T",
+                    "RGB,sixel",
                     "attach-session",
                     "-t",
                     f"lt-{self.sid}",
