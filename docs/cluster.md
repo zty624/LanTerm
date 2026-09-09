@@ -10,8 +10,6 @@ uv run python scripts/bundle.py
 
 生成 `dist/LanTerm.tar.gz`，包含后端、依赖锁文件、文档和已构建前端。容器需要 Python 3.11+、uv、tmux 3.3+ 和 Bash / Zsh。
 
-终端内显示图片还需要启用 Sixel 的 tmux，见 [终端图片](usage.md#终端图片)。
-
 ## 启动
 
 将运行包放入工作目录：

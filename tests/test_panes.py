@@ -126,42 +126,6 @@ async def test_pane_actions_validate_ownership_last_pane_and_limit(server):
     assert (await server.app.state.sessions.get(other["id"]))["pid"] == other["pid"]
 
 
-async def test_new_split_and_restarted_shells_ignore_stale_terminal_hints(server):
-    await server.login()
-    await server.create("seed", "bash")
-    manager = server.app.state.sessions
-    for key, value in (("KITTY_PID", "123456"), ("VTE_VERSION", "7600"), ("LT_USER_ENV", "kept")):
-        await manager.run(["set-environment", "-g", key, value])
-    item = await server.create("images", "bash")
-    sid = item["id"]
-
-    async def check_env(ws, stage: str) -> None:
-        await command(
-            ws,
-            f"printf '{stage}:%s/%s/%s/%s\\n' "
-            '"${KITTY_PID-unset}" "${VTE_VERSION-unset}" "$TERM_PROGRAM" "$LT_USER_ENV"',
-            f"{stage}:unset/unset/tmux/kept".encode(),
-        )
-
-    async with server.websocket(sid) as ws:
-        await check_env(ws, "new")
-        # Older sessions can retain their own hints as well as the server's globals.
-        await manager.run(["set-environment", "-t", f"lt-{sid}", "KITTY_PID", "654321"])
-        right = await split(server, sid, item["active_pane"], "horizontal")
-        await check_env(ws, "split")
-        for endpoint in ("pane", "session"):
-            await ws.send(b"exit\r")
-            async with asyncio.timeout(5):
-                while not (await manager.get(sid))["active_dead"]:
-                    await asyncio.sleep(0.05)
-            if endpoint == "pane":
-                await action(server, sid, right["id"], "restart")
-            else:
-                response = await server.client.post(f"/api/sessions/{sid}/restart")
-                response.raise_for_status()
-            await check_env(ws, endpoint)
-
-
 async def test_codex_plugin_tracks_both_panes_after_one_is_closed(server):
     await server.login()
     item = await server.create("agents", "bash")
