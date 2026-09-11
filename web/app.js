@@ -369,6 +369,7 @@ async function refresh() {
 
 async function enter() {
   state.config = await api('/config');
+  $('ssh-link').hidden = !state.config.experimental_ssh;
   state.sessions = await api('/sessions');
   state.loggedIn = true;
   plugins.reset(state.config.plugins || []);

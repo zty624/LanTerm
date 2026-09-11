@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>实验性 SSH · LanTerm</title>
+    <link rel="icon" href="static/lantern.svg" />
+    <link rel="stylesheet" href="static/ssh.css" />
+    <script defer src="static/ssh.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <a href="./">← LanTerm</a>
+        <span>实验功能</span>
+      </header>
+      <h1>浏览器 SSH 隧道</h1>
+      <p>每个实例都能映射自己的 sshd，也能接收本机 SSH。连接由你手动配对。</p>
+      <p id="settings" role="status">正在读取配置…</p>
+      <form id="login" hidden>
+        <h2>登录这个 LanTerm</h2>
+        <label>
+          访问密码
+          <input id="password" type="password" autocomplete="current-password" required />
+        </label>
+        <button>登录</button>
+      </form>
+      <section id="controls" hidden>
+        <form id="pair-form">
+          <h2>1. 在本机生成配对信息</h2>
+          <p>用本机浏览器打开本机 LanTerm 的此页面，填写远端地址。生成新配对会结束旧隧道。</p>
+          <label>
+            远端 LanTerm 地址
+            <input id="remote-url" type="url" placeholder="https://平台/.../proxy/8766/" required />
+          </label>
+          <button>生成配对信息</button>
+          <label id="pair-output" hidden>
+            配对信息（含临时凭证，请勿分享）
+            <textarea id="pair-code" readonly rows="4"></textarea>
+          </label>
+        </form>
+        <form id="connect-form">
+          <h2>2. 在远端页面接通</h2>
+          <p>
+            在同一台本机的浏览器里打开远端 LanTerm 的此页面，粘贴配对信息。平台登录态留在浏览器中。
+          </p>
+          <label>
+            本机生成的配对信息
+            <textarea
+              id="pair-input"
+              rows="4"
+              required
+              autocomplete="off"
+              spellcheck="false"
+            ></textarea>
+          </label>
+          <button id="connect">连接隧道</button>
+          <button id="rotate" type="button" disabled>模拟 WS 断线并重连</button>
+          <button id="stop" type="button" disabled>停止隧道</button>
+        </form>
+        <section class="connection">
+          <h2>连接状态</h2>
+          <p id="status" role="status">未连接</p>
+          <code id="command"></code>
+          <p>
+            保持此页面打开。WS 断线后自动续传；服务重启、配对过期或 SSH
+            自身超时会结束连接。缓冲满时暂停读取。
+          </p>
+          <p>
+            如果浏览器询问本地网络访问权限，请允许此页面连接本机。浏览器策略可能阻止 HTTPS
+            页面访问本机 WS；连接失败时会显示提示。
+          </p>
+        </section>
+      </section>
+      <p id="error" role="alert"></p>
+    </main>
+  </body>
+</html>

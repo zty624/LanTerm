@@ -17,7 +17,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=ROOT / "dist/LanTerm.tar.gz")
     args = parser.parse_args()
     assets = args.assets.resolve()
-    for name in ("index.html", "app.js", "app.css", "lantern.svg"):
+    for name in ("index.html", "app.js", "app.css", "lantern.svg", "ssh.html", "ssh.js", "ssh.css"):
         if not (assets / name).is_file():
             parser.error("前端尚未构建，请先执行 npm ci && npm run build")
     sources = [
@@ -30,6 +30,7 @@ def main() -> None:
             "README.md",
             "AGENTS.md",
             "docs/cluster.md",
+            "docs/ssh.md",
             "docs/plugins.md",
             "docs/usage.md",
             "terminal/tmux.conf",
@@ -68,6 +69,9 @@ def main() -> None:
             "app.js",
             "app.css",
             "lantern.svg",
+            "ssh.html",
+            "ssh.js",
+            "ssh.css",
             "app.js.LEGAL.txt",
             "app.css.LEGAL.txt",
         ):

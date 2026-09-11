@@ -23,7 +23,21 @@ def main() -> None:
     parser.add_argument("--max-sessions", type=int, default=32)
     parser.add_argument("--public-url", default="", help="反向代理后的完整访问地址，含路径前缀")
     parser.add_argument("--plugins", default="codex", help="状态插件，逗号分隔；none 关闭全部插件")
+    parser.add_argument("--experimental-ssh", action="store_true", help="启用实验性浏览器 SSH 隧道")
+    parser.add_argument("--ssh-target-port", type=int, default=22, help="本机 sshd 的回环目标端口")
+    parser.add_argument(
+        "--ssh-listen-port", type=int, default=2222, help="本机回环 SSH 转发监听端口"
+    )
+    parser.add_argument(
+        "--ssh-resume-seconds", type=int, default=120, help="隧道无消息时保留 TCP 的秒数"
+    )
     args = parser.parse_args()
+    if not (1 <= args.ssh_target_port <= 65535 and 1 <= args.ssh_listen_port <= 65535):
+        parser.error("SSH 端口必须在 1–65535")
+    if args.experimental_ssh and args.ssh_target_port == args.ssh_listen_port:
+        parser.error("sshd 目标端口不能与 SSH 转发监听端口相同")
+    if not 15 <= args.ssh_resume_seconds <= 600:
+        parser.error("ssh-resume-seconds 必须在 15–600")
     plugins = [] if args.plugins == "none" else list(dict.fromkeys(args.plugins.split(",")))
     if any(name not in PROVIDERS for name in plugins):
         parser.error(f"可用插件：{', '.join(PROVIDERS)}；或使用 none")
@@ -40,7 +54,13 @@ def main() -> None:
         logging.info("访问密码保存在 %s", config.state / "access-token")
     logging.info("退出 Web 服务会保留终端会话；在 Web UI 中关闭会话才会终止对应进程。")
     uvicorn.run(
-        create_app(config, plugins),
+        create_app(
+            config,
+            plugins,
+            (args.ssh_target_port, args.ssh_listen_port, args.ssh_resume_seconds)
+            if args.experimental_ssh
+            else None,
+        ),
         host=args.host,
         port=args.port,
         workers=1,

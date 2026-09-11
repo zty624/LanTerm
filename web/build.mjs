@@ -14,3 +14,12 @@ await build({
 });
 await copyFile('web/index.html', `${output}/index.html`);
 await copyFile('web/lantern.svg', `${output}/lantern.svg`);
+
+await build({
+  entryPoints: ['web/ssh.js', 'web/ssh.css'],
+  bundle: true,
+  minify: true,
+  outdir: output,
+  target: ['es2022'],
+});
+await copyFile('web/ssh.html', `${output}/ssh.html`);

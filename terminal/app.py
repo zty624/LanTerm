@@ -1,9 +1,10 @@
+import asyncio
 import logging
 import secrets
 import subprocess
 import time
 from collections import defaultdict, deque
-from contextlib import suppress
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
@@ -23,6 +24,8 @@ from terminal.plugins.registry import Plugins
 from terminal.proxy import PrefixMiddleware
 from terminal.pty import Terminal
 from terminal.sessions import SessionError, Sessions
+from terminal.ssh import install
+from terminal.tunnel import Tunnels
 
 LOG = logging.getLogger(__name__)
 TTL = 7 * 24 * 3600
@@ -44,14 +47,39 @@ class Auth:
             raise HTTPException(401, "请先登录")
 
 
-def create_app(config: Config, plugins: list[str]) -> FastAPI:
-    app = FastAPI(title="LanTerm", docs_url=None, redoc_url=None, openapi_url=None)
+def create_app(
+    config: Config, plugins: list[str], ssh: tuple[int, int, int] | None = None
+) -> FastAPI:
+    hub = Tunnels(*ssh) if ssh is not None else None
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        task = None
+        try:
+            if hub is not None:
+                await hub.start()
+                task = asyncio.create_task(hub.sweep(lambda: auth.tokens))
+            yield
+        finally:
+            if task is not None:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            if hub is not None:
+                await hub.close()
+
+    app = FastAPI(
+        title="LanTerm", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
+    )
     sessions = Sessions(config)
     panes = Panes(sessions)
     auth = Auth(config)
     monitor = Monitor(config.cwd, Path("/proc"), 3.0)
     app.state.sessions = sessions
     app.state.auth = auth
+    app.state.tunnels = hub
+    if hub is not None:
+        install(app, auth, hub)
     app.state.monitor = monitor
     status = Plugins(sessions, plugins, 0.25)
     app.state.plugins = status
@@ -70,7 +98,12 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
                 "Referrer-Policy": "no-referrer",
                 "Content-Security-Policy": (
                     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-                    "connect-src 'self'; img-src 'self' data:; font-src 'self'; "
+                    + (
+                        "connect-src 'self' ws://127.0.0.1:* wss://127.0.0.1:*; "
+                        if hub is not None and request.url.path.rstrip("/").endswith("/ssh")
+                        else "connect-src 'self'; "
+                    )
+                    + "img-src 'self' data:; font-src 'self'; "
                     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
                 ),
             }
@@ -132,6 +165,8 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
     async def logout(request: Request, response: Response):
         token = request.cookies.get(config.cookie, "")
         auth.tokens.pop(token, None)
+        if hub is not None:
+            await hub.revoke(token)
         for ws in list(auth.sockets.get(token, set())):
             if ws.application_state == WebSocketState.CONNECTED:
                 with suppress(WebSocketDisconnect):
@@ -147,6 +182,7 @@ def create_app(config: Config, plugins: list[str]) -> FastAPI:
             "cwd": str(config.cwd),
             "max_sessions": config.max_sessions,
             "plugins": status.catalog(),
+            "experimental_ssh": hub is not None,
         }
 
     @api.get("/plugins/status")
