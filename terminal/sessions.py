@@ -23,7 +23,7 @@ class SessionError(RuntimeError):
 
 def child_env() -> dict[str, str]:
     env = os.environ.copy()
-    for key in ("TMUX", "TMUX_PANE", "LAN_TERMINAL_PASSWORD"):
+    for key in ("TMUX", "TMUX_PANE", "LAN_TERMINAL_PASSWORD", "NO_COLOR"):
         env.pop(key, None)
     env.update(TERM="xterm-256color", COLORTERM="truecolor")
     return env
