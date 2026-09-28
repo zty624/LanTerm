@@ -457,6 +457,7 @@ test('real terminal UI, Vim, sessions, reconnect, service restart and mobile lay
   await expect(page.locator('#connection-status')).toHaveText('已连接');
   await run(page, "stty -echo; export LT_UI_VALUE=retained; printf 'browser:%s\\n' ready");
   await expect(page.locator('.xterm-rows')).toContainText('browser:ready');
+  await page.getByLabel('更多会话操作').click();
   await page.getByRole('button', { name: '重命名', exact: true }).click();
   await page.getByLabel('会话名称').fill('开发 · Vim');
   await page.getByRole('button', { name: '保存名称' }).click();
@@ -519,7 +520,8 @@ test('real terminal UI, Vim, sessions, reconnect, service restart and mobile lay
   await expect(page.locator('#connection-status')).toHaveText('已连接');
   await run(page, 'printf \'service-restart:%s\\n\' "$LT_UI_VALUE"');
   await expect(page.locator('.xterm-rows')).toContainText('service-restart:retained');
-  await page.getByRole('button', { name: '历史', exact: true }).click();
+  await page.getByLabel('更多会话操作').click();
+  await page.getByRole('button', { name: '终端历史', exact: true }).click();
   await expect(page.locator('#history-content')).toContainText('service-restart:retained');
   await page.getByRole('button', { name: '关闭历史', exact: true }).click();
   await run(page, 'clear');
@@ -537,6 +539,7 @@ test('real terminal UI, Vim, sessions, reconnect, service restart and mobile lay
     .toBe(true);
   await page.screenshot({ path: '.runtime/webui-mobile.png' });
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByLabel('更多会话操作').click();
   await page.locator('#close-session').click();
   await page.getByRole('button', { name: '结束会话', exact: true }).click();
   await expect(page.locator('#active-name')).toHaveText('Second session');
@@ -559,13 +562,16 @@ test('session organization, batch actions and resource dashboard preserve termin
   await expect(page.locator('#connection-status')).toHaveText('已连接');
   await run(page, "export LT_MANAGE=keep; printf 'managed:%s\\n' ready");
   await expect(page.locator('.xterm-rows')).toContainText('managed:ready');
+  await page.getByLabel('更多会话操作').click();
   await page.locator('#pin-session').click();
   await expect(page.locator('.session-item[aria-current="true"] .session-icon')).toHaveText('★');
   const original = (await (await page.request.get(service.url + '/api/sessions')).json())[0];
+  await page.getByLabel('更多会话操作').click();
   await page.locator('#duplicate-session').click();
   await expect(page.locator('#active-name')).toHaveText('Training A 副本');
   await page.getByLabel('搜索会话').fill('gpu');
   await expect(page.locator('.session-item')).toHaveCount(2);
+  await page.locator('#filter-options summary').click();
   await page.getByLabel('筛选状态').selectOption('pinned');
   await expect(page.locator('.session-item')).toHaveCount(1);
   await expect(page.locator('.session-item')).toContainText('Training A');
@@ -792,4 +798,50 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
   await page.waitForTimeout(3400);
   expect(calls).toBe(stoppedAt);
   expect(errors).toEqual([]);
+});
+
+test('compact controls preserve terminal input and work on narrow screens', async ({
+  page,
+  service,
+}) => {
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Development');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await run(page, "printf 'workspace:%s\\n' ready");
+  await expect(page.locator('.xterm-rows')).toContainText('workspace:ready');
+  await expect(page.getByLabel('筛选状态')).toBeHidden();
+  await page.locator('#filter-options summary').click();
+  await page.getByLabel('筛选状态').selectOption('pinned');
+  await expect(page.locator('.session-item')).toHaveCount(0);
+  await page.locator('#filter-options summary').click();
+  await expect(page.locator('#filter-summary')).toHaveText('1 项筛选');
+  await page.locator('#filter-options summary').click();
+  await page.locator('#clear-filters').click();
+  await expect(page.locator('.session-item')).toHaveCount(1);
+  await page.locator('#filter-options summary').click();
+  for (const width of [1440, 1050, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByLabel('更多会话操作').click();
+    await expect(page.locator('#rename-session')).toBeVisible();
+    const menu = await page.locator('.session-menu-items').boundingBox();
+    expect(menu.x).toBeGreaterThanOrEqual(0);
+    expect(menu.x + menu.width).toBeLessThanOrEqual(width);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#rename-session')).toBeHidden();
+    await expect(page.getByLabel('更多会话操作')).toBeFocused();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    if (width !== 1050) await page.screenshot({ path: `.runtime/compact-${width}.png` });
+  }
+  await page.locator('#toggle-sidebar').click();
+  await expect(page.locator('#sidebar')).toBeVisible();
+  await expect(page.locator('#toggle-sidebar')).toHaveAttribute('aria-expanded', 'true');
+  await page.locator('#sidebar-backdrop').click({ position: { x: 350, y: 200 } });
+  await expect(page.locator('#sidebar')).toBeHidden();
+  await expect(page.locator('#toggle-sidebar')).toHaveAttribute('aria-expanded', 'false');
+  await run(page, "printf 'input:%s\\n' preserved");
+  await expect(page.locator('.xterm-rows')).toContainText('input:preserved');
 });

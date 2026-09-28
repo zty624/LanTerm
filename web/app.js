@@ -125,6 +125,7 @@ function disconnect() {
 }
 
 function showLogin() {
+  $('session-menu').open = false;
   state.loggedIn = false;
   plugins.reset([]);
   panes.reset();
@@ -252,6 +253,13 @@ function syncPanes() {
 
 function render() {
   groupOptions();
+  const filters = [
+    $('filter-query').value.trim(),
+    $('filter-group').value,
+    $('filter-status').value !== 'all',
+  ].filter(Boolean).length;
+  $('filter-summary').textContent = filters ? `${filters} 项筛选` : '';
+  $('clear-filters').hidden = !filters;
   const ids = new Set(state.sessions.map((item) => item.id));
   state.selected = new Set([...state.selected].filter((id) => ids.has(id)));
   const visible = filteredSessions();
@@ -315,12 +323,15 @@ function render() {
     fragment.append(empty);
   }
   $('session-list').replaceChildren(fragment);
-  $('session-count').textContent = `${visible.length} / ${state.sessions.length}`;
+  $('session-count').textContent = filters
+    ? `${visible.length} / ${state.sessions.length}`
+    : String(state.sessions.length);
   $('batch-tools').hidden = !state.batch;
   $('selected-count').textContent = `已选 ${state.selected.size}`;
   $('batch-mode').textContent = state.batch ? '退出批量' : '批量管理';
   const item = active();
   const monitoring = state.view === 'resources';
+  if (monitoring || !item) $('session-menu').open = false;
   $('active-name').textContent = monitoring ? '资源监控' : item?.name || '工作空间';
   $('active-detail').textContent = monitoring
     ? '容器配额 · GPU · Session 进程'
@@ -379,7 +390,7 @@ async function enter() {
   $('session-shell').replaceChildren(
     ...state.config.shells.map((shell) => new Option(shell, shell)),
   );
-  if (matchMedia('(max-width: 700px)').matches) document.body.classList.add('sidebar-hidden');
+  setSidebar(matchMedia('(max-width: 700px)').matches);
   const saved = localStorage.getItem('lt-active');
   state.active = null;
   if (state.sessions.length)
@@ -418,6 +429,8 @@ function sendInput(text) {
 }
 
 function select(sid) {
+  $('session-menu').open = false;
+  if (matchMedia('(max-width: 700px)').matches) setSidebar(true);
   state.view = 'terminal';
   if (state.active === sid && state.ws) {
     render();
@@ -430,7 +443,6 @@ function select(sid) {
   state.retries = 0;
   localStorage.setItem('lt-active', sid);
   render();
-  if (matchMedia('(max-width: 700px)').matches) document.body.classList.add('sidebar-hidden');
   connect();
 }
 
@@ -813,6 +825,13 @@ bind('show-monitor', () => {
 bind('monitor-refresh', () => resources.refresh());
 for (const id of ['filter-query', 'filter-group', 'filter-status', 'session-sort'])
   $(id).addEventListener(id === 'filter-query' ? 'input' : 'change', render);
+bind('clear-filters', () => {
+  $('filter-query').value = '';
+  $('filter-group').value = '';
+  $('filter-status').value = 'all';
+  render();
+  $('filter-query').focus();
+});
 bind('close-session', () => {
   if (!active()) return;
   $('close-name').textContent = active().name;
@@ -858,9 +877,26 @@ bind('logout', async () => {
   await api('/logout', 'POST');
   showLogin();
 });
+function setSidebar(hidden) {
+  document.body.classList.toggle('sidebar-hidden', hidden);
+  $('toggle-sidebar').setAttribute('aria-expanded', String(!hidden));
+}
 bind('toggle-sidebar', () => {
-  document.body.classList.toggle('sidebar-hidden');
+  setSidebar(!document.body.classList.contains('sidebar-hidden'));
   fit();
+});
+bind('sidebar-backdrop', () => {
+  setSidebar(true);
+  $('toggle-sidebar').focus();
+});
+document.addEventListener('click', (event) => {
+  const menu = $('session-menu');
+  if (!menu.open) return;
+  if (!menu.contains(event.target)) menu.open = false;
+  else if (event.target.closest('button')) {
+    menu.open = false;
+    menu.querySelector('summary').focus();
+  }
 });
 bind('fullscreen', async () => {
   if (document.fullscreenElement) await document.exitFullscreen();
@@ -900,6 +936,22 @@ $('terminal').addEventListener('contextmenu', (event) => {
 });
 document.addEventListener('keydown', (event) => {
   if (!state.loggedIn || document.querySelector('dialog[open]')) return;
+  if (event.key === 'Escape' && $('session-menu').open) {
+    event.preventDefault();
+    $('session-menu').open = false;
+    $('session-menu').querySelector('summary').focus();
+    return;
+  }
+  if (
+    event.key === 'Escape' &&
+    matchMedia('(max-width: 700px)').matches &&
+    !document.body.classList.contains('sidebar-hidden')
+  ) {
+    event.preventDefault();
+    setSidebar(true);
+    $('toggle-sidebar').focus();
+    return;
+  }
   if (event.ctrlKey && event.shiftKey && event.code === 'KeyK') {
     event.preventDefault();
     sessionDialog(null);
@@ -911,7 +963,7 @@ document.addEventListener('keydown', (event) => {
 });
 new ResizeObserver(() => requestAnimationFrame(fit)).observe($('terminal'));
 matchMedia('(max-width: 700px)').addEventListener('change', (event) => {
-  document.body.classList.toggle('sidebar-hidden', event.matches);
+  setSidebar(event.matches);
   fit();
 });
 window.addEventListener('online', () => {

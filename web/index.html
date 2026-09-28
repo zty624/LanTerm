@@ -51,7 +51,6 @@
             height="32"
           />
           <strong>LanTerm</strong>
-          <span class="tag">LOCAL</span>
           <a id="ssh-link" href="ssh" target="_blank" rel="noopener" hidden>SSH 连接</a>
         </div>
         <div class="section-label">
@@ -70,27 +69,34 @@
             aria-label="搜索会话"
             placeholder="搜索名称、标签、目录…"
           />
-          <div class="filter-row">
-            <select id="filter-group" aria-label="筛选分组">
-              <option value="">全部分组</option>
-            </select>
-            <select id="filter-status" aria-label="筛选状态">
-              <option value="all">全部状态</option>
-              <option value="running">运行中</option>
-              <option value="exited">已退出</option>
-              <option value="attached">已连接</option>
-              <option value="detached">后台运行</option>
-              <option value="pinned">已置顶</option>
-            </select>
-          </div>
-          <div class="filter-row">
-            <select id="session-sort" aria-label="会话排序">
-              <option value="created">创建时间</option>
-              <option value="activity">最近活动</option>
-              <option value="name">名称排序</option>
-            </select>
-            <button id="batch-mode">批量管理</button>
-          </div>
+          <details id="filter-options" class="filter-options">
+            <summary>
+              筛选与排序
+              <span id="filter-summary"></span>
+            </summary>
+            <div class="filter-row">
+              <select id="filter-group" aria-label="筛选分组">
+                <option value="">全部分组</option>
+              </select>
+              <select id="filter-status" aria-label="筛选状态">
+                <option value="all">全部状态</option>
+                <option value="running">运行中</option>
+                <option value="exited">已退出</option>
+                <option value="attached">已连接</option>
+                <option value="detached">后台运行</option>
+                <option value="pinned">已置顶</option>
+              </select>
+            </div>
+            <div class="filter-row">
+              <select id="session-sort" aria-label="会话排序">
+                <option value="created">创建时间</option>
+                <option value="activity">最近活动</option>
+                <option value="name">名称排序</option>
+              </select>
+              <button id="batch-mode">批量管理</button>
+            </div>
+            <button id="clear-filters" class="text-button" hidden>清除筛选</button>
+          </details>
         </div>
         <div id="batch-tools" class="batch-tools" hidden>
           <span id="selected-count">已选 0</span>
@@ -142,9 +148,17 @@
           </button>
         </div>
       </aside>
+      <button id="sidebar-backdrop" aria-label="收起侧栏" tabindex="-1"></button>
       <section class="main-panel">
         <header class="toolbar">
-          <button id="toggle-sidebar" class="icon-button" title="切换侧栏" aria-label="切换侧栏">
+          <button
+            id="toggle-sidebar"
+            class="icon-button"
+            title="切换侧栏"
+            aria-label="切换侧栏"
+            aria-controls="sidebar"
+            aria-expanded="true"
+          >
             ☰
           </button>
           <div class="session-heading">
@@ -152,21 +166,30 @@
             <span id="active-detail">选择或新建一个终端</span>
           </div>
           <div class="toolbar-actions" id="session-actions" hidden>
-            <button id="rename-session" title="重命名会话">重命名</button>
-            <button id="pin-session">置顶</button>
-            <button id="duplicate-session" title="使用相同 Shell、当前目录和分组创建新会话">
-              复制
-            </button>
-            <button id="session-details">详情</button>
             <button id="show-panes" title="左右 / 上下分屏，管理当前窗口">分屏</button>
-            <button id="show-history" title="查看 tmux 保留的完整历史">历史</button>
             <button id="show-search" title="搜索当前终端缓冲区 · Ctrl+Shift+F">搜索</button>
             <button id="show-paste" title="粘贴文本；也可直接使用 Ctrl+Shift+V">粘贴</button>
             <button id="show-keys" title="发送被浏览器占用的控制键">按键</button>
             <button id="restart-session" hidden>重新启动</button>
-            <button id="close-session" class="danger-subtle" title="结束此会话及其中的进程">
-              关闭
-            </button>
+            <details id="session-menu" class="session-menu">
+              <summary aria-label="更多会话操作">
+                更多
+                <span aria-hidden="true">⌄</span>
+              </summary>
+              <div class="session-menu-items">
+                <span class="menu-label">当前会话</span>
+                <button id="rename-session" title="重命名会话">重命名</button>
+                <button id="pin-session">置顶</button>
+                <button id="duplicate-session" title="使用相同 Shell、当前目录和分组创建新会话">
+                  复制会话
+                </button>
+                <button id="session-details">会话详情</button>
+                <button id="show-history" title="查看 tmux 保留的完整历史">终端历史</button>
+                <button id="close-session" class="danger-subtle" title="结束此会话及其中的进程">
+                  关闭会话…
+                </button>
+              </div>
+            </details>
           </div>
           <button id="show-monitor" class="monitor-toggle">资源监控</button>
           <button id="fullscreen" class="icon-button" title="全屏" aria-label="全屏">⛶</button>
