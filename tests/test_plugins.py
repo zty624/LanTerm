@@ -6,6 +6,7 @@ import signal
 import sys
 from pathlib import Path
 
+import pytest
 from test_terminal import command
 
 from terminal.plugins.registry import Plugins
@@ -27,7 +28,8 @@ async def status(server, sid: str, expected: str) -> dict:
             await asyncio.sleep(0.1)
 
 
-async def test_codex_lifecycle_in_real_detached_tmux_survives_plugin_restart(server):
+@pytest.mark.parametrize("mode", [[], ["--delegate"]], ids=["direct", "app-server"])
+async def test_codex_lifecycle_in_real_detached_tmux_survives_plugin_restart(server, mode):
     assert (await server.client.get("/api/plugins/status")).status_code == 401
     await server.login()
     item = await server.create("agent", "bash")
@@ -35,7 +37,7 @@ async def test_codex_lifecycle_in_real_detached_tmux_survives_plugin_restart(ser
     target = f"lt-{item['id']}"
     manager = server.app.state.sessions
     async with server.websocket(item["id"]) as ws:
-        await command(ws, shlex.join([sys.executable, str(DRIVER)]), b"fixture:ready")
+        await command(ws, shlex.join([sys.executable, str(DRIVER), *mode]), b"fixture:ready")
         first = await status(server, item["id"], "waiting_input")
         assert first["source"] == "lifecycle"
         for key, state in [
@@ -107,12 +109,13 @@ async def test_respawn_and_reused_pane_number_do_not_inherit_codex_status(server
             await asyncio.sleep(0.1)
 
 
-async def test_two_codex_processes_in_same_directory_and_paused_agent(server):
+@pytest.mark.parametrize("mode", [[], ["--delegate"]], ids=["direct", "app-server"])
+async def test_two_codex_processes_in_same_directory_and_paused_agent(server, mode):
     await server.login()
     first = await server.create("one", "bash")
     second = await server.create("two", "bash")
     async with server.websocket(first["id"]) as one, server.websocket(second["id"]) as two:
-        start = shlex.join([sys.executable, str(DRIVER)])
+        start = shlex.join([sys.executable, str(DRIVER), *mode])
         await command(one, start, b"fixture:ready")
         await command(two, start, b"fixture:ready")
         await one.send(b"w")

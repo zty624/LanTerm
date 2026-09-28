@@ -30,6 +30,6 @@ cat "${XDG_RUNTIME_DIR:-/tmp/lan-terminal-$(id -u)}/lan-terminal-8766/access-tok
 
 - [参数、操作与后台运行](docs/usage.md)
 - [容器部署](docs/cluster.md)
-- [实验性浏览器 SSH 隧道](docs/ssh.md)
+- [浏览器 SSH 连接](docs/ssh.md)
 - [状态插件](docs/plugins.md)
 - [开发](docs/usage.md#开发)

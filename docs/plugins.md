@@ -19,9 +19,9 @@
 
 ## 识别方式
 
-按 tmux pane 的进程树和终端设备定位本机 Codex，再读取它已打开的根会话日志与终端标题。子代理日志会被过滤；切换线程时选择最近写入的根日志。
+按 tmux pane 的进程树和终端设备定位本机 Codex，再读取它已打开的根会话日志与终端标题。Codex 0.157.1 会将日志交给直接子进程 `app-server`；插件也会读取该私有子进程的根日志（包括标记为 `vscode` 的会话来源），状态仍归属原 CLI。不会扫描全局 Codex 日志或借用其他进程的状态。子代理日志会被过滤；切换线程时选择最近写入的根日志。
 
-生命周期字段对照 Codex CLI 0.153.4，标题模式参考 [Codex 源码](https://github.com/openai/codex/blob/main/codex-rs/tui/src/chatwidget/status_surfaces.rs)。这些字段可能随版本变化。SSH 内的远端 Codex 无法识别；共享 app-server / remote 模式也可能缺少信号。
+生命周期字段对照 Codex CLI 0.153.4 / 0.157.1，标题模式参考 [Codex 源码](https://github.com/openai/codex/blob/main/codex-rs/tui/src/chatwidget/status_surfaces.rs)。这些字段可能随版本变化。SSH 内的远端 Codex 无法识别；共享 app-server / remote 模式也可能缺少信号。
 
 日志按 1 MiB 窗口增量读取，API 只返回状态和进程标识，不返回对话或工具参数。插件不修改 Codex 配置，也不代替用户审批或回答。
 

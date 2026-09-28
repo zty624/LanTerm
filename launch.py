@@ -23,7 +23,13 @@ def main() -> None:
     parser.add_argument("--max-sessions", type=int, default=32)
     parser.add_argument("--public-url", default="", help="反向代理后的完整访问地址，含路径前缀")
     parser.add_argument("--plugins", default="codex", help="状态插件，逗号分隔；none 关闭全部插件")
-    parser.add_argument("--experimental-ssh", action="store_true", help="启用实验性浏览器 SSH 隧道")
+    parser.add_argument(
+        "--ssh",
+        "--experimental-ssh",
+        dest="ssh",
+        action="store_true",
+        help="启用浏览器 SSH 隧道（兼容 --experimental-ssh）",
+    )
     parser.add_argument("--ssh-target-port", type=int, default=22, help="本机 sshd 的回环目标端口")
     parser.add_argument(
         "--ssh-listen-port", type=int, default=2222, help="本机回环 SSH 转发监听端口"
@@ -34,7 +40,7 @@ def main() -> None:
     args = parser.parse_args()
     if not (1 <= args.ssh_target_port <= 65535 and 1 <= args.ssh_listen_port <= 65535):
         parser.error("SSH 端口必须在 1–65535")
-    if args.experimental_ssh and args.ssh_target_port == args.ssh_listen_port:
+    if args.ssh and args.ssh_target_port == args.ssh_listen_port:
         parser.error("sshd 目标端口不能与 SSH 转发监听端口相同")
     if not 15 <= args.ssh_resume_seconds <= 600:
         parser.error("ssh-resume-seconds 必须在 15–600")
@@ -58,7 +64,7 @@ def main() -> None:
             config,
             plugins,
             (args.ssh_target_port, args.ssh_listen_port, args.ssh_resume_seconds)
-            if args.experimental_ssh
+            if args.ssh
             else None,
         ),
         host=args.host,

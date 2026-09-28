@@ -50,7 +50,7 @@ def tty_device(pid: int) -> int:
 class CodexStatus:
     id = "codex"
     name = "Codex 状态"
-    version = "1.0.1"
+    version = "1.1.0"
 
     def __init__(self, sessions: Sessions):
         self.sessions = sessions
@@ -89,18 +89,34 @@ class CodexStatus:
 
     def lifecycle(self, proc: psutil.Process, used: set[Path]) -> tuple[str, str]:
         paths = []
-        opened = [Path(file.path) for file in proc.open_files()]
-        candidates = [p for p in opened if p.name.startswith("rollout-") and p.suffix == ".jsonl"]
-        for path in candidates[:32]:
+        # Newer CLIs delegate the session to their own detached app-server.
+        # Only direct children belong to this CLI; nested CLI tools and shared
+        # servers must not supply its status.
+        owners = [(proc, {"cli", "exec"})]
+        for child in proc.children():
             try:
-                if is_root(path):
-                    paths.append(path)
-            except (FileNotFoundError, PermissionError):
+                if child.name() == "codex" and "app-server" in child.cmdline()[1:3]:
+                    owners.append((child, {"cli", "exec", "vscode"}))
+            except psutil.NoSuchProcess:
                 continue
+        for owner, sources in owners:
+            try:
+                opened = [Path(file.path) for file in owner.open_files()]
+            except psutil.NoSuchProcess:
+                continue
+            candidates = [
+                p for p in opened if p.name.startswith("rollout-") and p.suffix == ".jsonl"
+            ]
+            for path in candidates[:32]:
+                try:
+                    if is_root(path, sources):
+                        paths.append((path.stat().st_mtime_ns, path))
+                except (FileNotFoundError, PermissionError):
+                    continue
         if not paths:
             return "unknown", "process"
         # If a CLI switches/resumes threads, its most recently written root log is active.
-        path = max(paths, key=lambda item: item.stat().st_mtime_ns)
+        _, path = max(paths)
         used.add(path)
         if path not in self.logs:
             self.logs[path] = Rollout(path)

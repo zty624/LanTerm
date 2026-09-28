@@ -1,4 +1,4 @@
-"""HTTP and browser bridge entry points for the opt-in SSH experiment."""
+"""HTTP and browser bridge entry points for the opt-in SSH tunnel."""
 
 import asyncio
 import secrets

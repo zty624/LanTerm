@@ -105,11 +105,11 @@ class Rollout:
             self.state = "waiting_input" if self.pending else "working"
 
 
-def is_root(path: Path) -> bool:
+def is_root(path: Path, sources: set[str]) -> bool:
     with path.open("rb") as stream:
         meta = record(stream.readline(HEADER_LIMIT))
     if meta is None or meta.type != "session_meta":
         return False
     # Subagent hooks/transcripts must never replace the parent CLI's status.
     source = meta.payload.source
-    return source == "cli" or source == "exec"
+    return any(source == allowed for allowed in sources)

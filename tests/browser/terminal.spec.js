@@ -379,7 +379,9 @@ test('Codex plugin updates inactive sessions, survives restart and sends Ctrl+/'
   const quote = (text) => "'" + text.replaceAll("'", "'\\''") + "'";
   await run(
     page,
-    [resolve('.venv/bin/python'), resolve('tests/fixtures/codex_process.py')].map(quote).join(' '),
+    [resolve('.venv/bin/python'), resolve('tests/fixtures/codex_process.py'), '--delegate']
+      .map(quote)
+      .join(' '),
   );
   await expect(page.locator('.xterm-rows')).toContainText('fixture:ready');
   const badge = page.locator(`[data-plugin-session="${session.id}"] .plugin-badge`);

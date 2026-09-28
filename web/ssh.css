@@ -14,41 +14,106 @@ body {
 }
 main {
   max-width: 850px;
-  margin: 40px auto;
+  margin: 32px auto;
   padding: 0 24px 48px;
 }
-header {
+header,
+.route,
+.actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 16px;
+}
+header {
+  justify-content: space-between;
+  color: #82918f;
 }
 a {
-  color: #8bcdb0;
+  color: #98d7b6;
+  text-decoration: none;
 }
-header span {
-  border: 1px solid #7d6143;
-  border-radius: 20px;
-  padding: 2px 12px;
-  color: #efc389;
+a:hover {
+  text-decoration: underline;
 }
 h1 {
-  margin-bottom: 8px;
-  font-size: 30px;
+  margin: 32px 0 8px;
+  font-size: clamp(24px, 5vw, 32px);
+  letter-spacing: -0.5px;
 }
 h2 {
   margin-top: 0;
-  font-size: 19px;
+  font-size: 18px;
+  font-weight: 600;
 }
 p {
   color: #aeb8c4;
 }
-form,
-.connection {
+.intro {
+  margin-top: 0;
+}
+.route {
   margin: 24px 0;
+  padding: 16px;
+  justify-content: center;
+  border: 1px solid #303948;
+  border-radius: 10px;
+}
+.route b {
+  color: #98d7b6;
+}
+.caption,
+small {
+  font-size: 13px;
+  color: #96a3b2;
+}
+#settings {
+  overflow-wrap: anywhere;
+}
+.roles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+.roles button {
+  text-align: left;
+  padding: 18px;
+  margin: 0;
+  background: #191e26;
+  color: #e1e6ec;
+  border: 1px solid #394451;
+}
+.roles button[aria-pressed='true'] {
+  border-color: #98d7b6;
+  background: #1e302a;
+}
+.roles strong,
+.roles small {
+  display: block;
+}
+.hint {
+  border-left: 2px solid #98d7b6;
+  padding-left: 14px;
+}
+form,
+.card {
+  margin: 20px 0;
   padding: 24px;
   background: #191e26;
   border: 1px solid #303948;
   border-radius: 12px;
+}
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #2b3c34;
+  color: #98d7b6;
+  font-size: 14px;
 }
 label {
   display: block;
@@ -69,20 +134,33 @@ textarea {
 textarea {
   resize: vertical;
   overflow-wrap: anywhere;
+  font-size: 13px;
 }
-button {
+button,
+.button {
+  display: inline-block;
   padding: 10px 15px;
   margin: 4px 8px 4px 0;
   background: #98d7b6;
   color: #14221b;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
   font: inherit;
+  text-decoration: none;
+}
+.secondary {
+  color: #c9d6d0;
+  background: transparent;
+  border: 1px solid #445064;
 }
 button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+button:hover:not(:disabled),
+.button:hover {
+  filter: brightness(1.1);
 }
 :focus-visible {
   outline: 2px solid #98d7b6;
@@ -92,11 +170,48 @@ button:disabled {
   color: #ffafa7;
   white-space: pre-wrap;
 }
+#notice,
+.status {
+  color: #98d7b6;
+}
 code {
   display: block;
+  padding: 16px;
+  border-radius: 6px;
+  background: #101318;
   overflow-wrap: anywhere;
   color: #98d7b6;
 }
+details {
+  margin-top: 20px;
+  border-top: 1px solid #303948;
+  padding-top: 16px;
+}
+summary {
+  cursor: pointer;
+  color: #aeb8c4;
+}
 [hidden] {
   display: none !important;
+}
+@media (max-width: 560px) {
+  main {
+    padding: 0 16px 32px;
+    margin-top: 20px;
+  }
+  form,
+  .card {
+    padding: 18px;
+  }
+  .roles {
+    grid-template-columns: 1fr;
+  }
+  .route {
+    gap: 10px;
+    font-size: 13px;
+  }
+  .actions {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 }

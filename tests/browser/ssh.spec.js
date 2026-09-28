@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -37,7 +37,7 @@ async function start(target, prefix) {
       'bash',
       '--plugins',
       'none',
-      '--experimental-ssh',
+      prefix ? '--experimental-ssh' : '--ssh',
       '--ssh-listen-port',
       String(ssh),
       '--ssh-target-port',
@@ -76,8 +76,8 @@ async function start(target, prefix) {
   throw new Error('SSH service startup timed out');
 }
 
-async function login(page, service) {
-  await page.goto(`${service.url}/ssh`);
+async function login(page, service, role = 'local') {
+  await page.goto(`${service.url}/ssh?role=${role}`);
   await page.locator('#password').fill(service.password);
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.locator('#controls')).toBeVisible();
@@ -117,24 +117,61 @@ test('browser pairs two instances and preserves TCP over WS interruption', async
     for (const page of [localPage, remotePage])
       page.on('pageerror', (error) => errors.push(error.message));
     await login(localPage, local);
+    await expect(localPage.locator('#connect-form')).toBeHidden();
+    await localPage.locator('#remote-url').fill(`${local.url}/`);
+    await localPage.getByRole('button', { name: '生成配对信息', exact: true }).click();
+    await expect(localPage.getByRole('alert')).toContainText('当前本机页面');
     await localPage.locator('#remote-url').fill(`${remote.url}/`);
-    await localPage.getByRole('button', { name: '生成配对信息' }).click();
+    await localPage.getByRole('button', { name: '生成配对信息', exact: true }).click();
     await expect(localPage.locator('#pair-output')).toBeVisible();
     const pair = await localPage.locator('#pair-code').inputValue();
-    await login(remotePage, remote);
+    await expect(localPage.locator('#open-remote')).toHaveAttribute(
+      'href',
+      `${remote.url}/ssh?role=remote`,
+    );
+    await login(remotePage, remote, 'remote');
+    await expect(remotePage.locator('#pair-form')).toBeHidden();
+    const wrong = JSON.parse(pair);
+    wrong.remote = `${remote.url}/other/ssh`;
+    await remotePage.locator('#pair-input').fill(JSON.stringify(wrong));
+    await remotePage.getByRole('button', { name: '连接隧道', exact: true }).click();
+    await expect(remotePage.getByRole('alert')).toContainText('远端路径与配对目标不一致');
     await remotePage.locator('#pair-input').fill(pair);
     await remotePage.getByRole('button', { name: '连接隧道', exact: true }).click();
     await expect(remotePage.locator('#status')).toContainText('已连接');
+    await expect(remotePage.locator('#copy-command')).toBeDisabled();
+    await remotePage.getByLabel('远端 SSH 用户名', { exact: true }).fill('developer');
+    await expect(remotePage.locator('#command')).toHaveText(
+      `ssh -p ${local.ssh} developer@127.0.0.1`,
+    );
+    await expect(remotePage.locator('#copy-command')).toBeEnabled();
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await remotePage.locator('#copy-command').click();
+    expect(await remotePage.evaluate(() => navigator.clipboard.readText())).toBe(
+      `ssh -p ${local.ssh} developer@127.0.0.1`,
+    );
+    await mkdir('.runtime', { recursive: true });
+    // The remote input has been cleared; screenshots contain no pairing credentials.
+    await remotePage.screenshot({ path: '.runtime/ssh-desktop.png', fullPage: true });
+    await remotePage.setViewportSize({ width: 390, height: 844 });
+    await remotePage.screenshot({ path: '.runtime/ssh-mobile.png', fullPage: true });
+    expect(
+      await remotePage.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    ).toBe(true);
     socket = createConnection({ host: '127.0.0.1', port: local.ssh });
     const first = randomBytes(128 * 1024);
     expect(await exchange(socket, first)).toEqual(first);
-    await remotePage.getByRole('button', { name: '模拟 WS 断线并重连' }).click();
+    await remotePage.getByText('连接帮助与诊断', { exact: true }).click();
+    await remotePage.getByRole('button', { name: '测试断线重连' }).click();
     const second = randomBytes(1024 * 1024);
     expect(await exchange(socket, second)).toEqual(second);
     await expect(remotePage.locator('#status')).toContainText('已连接');
     const closed = new Promise((resolve) => socket.once('close', resolve));
     await remotePage.getByRole('button', { name: '停止隧道', exact: true }).click();
     await closed;
+    await expect(remotePage.locator('#command-panel')).toBeHidden();
+    await localPage.locator('#revoke').click();
+    await expect(localPage.locator('#local-status')).toContainText('尚未配对');
     expect(errors).toEqual([]);
   } finally {
     socket?.destroy();

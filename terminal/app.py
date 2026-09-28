@@ -182,6 +182,7 @@ def create_app(
             "cwd": str(config.cwd),
             "max_sessions": config.max_sessions,
             "plugins": status.catalog(),
+            "ssh": hub is not None,
             "experimental_ssh": hub is not None,
         }
 

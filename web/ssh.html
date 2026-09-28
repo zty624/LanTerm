@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>实验性 SSH · LanTerm</title>
+    <title>SSH 连接 · LanTerm</title>
     <link rel="icon" href="static/lantern.svg" />
     <link rel="stylesheet" href="static/ssh.css" />
     <script defer src="static/ssh.js"></script>
@@ -11,14 +11,21 @@
   <body>
     <main>
       <header>
-        <a href="./">← LanTerm</a>
-        <span>实验功能</span>
+        <a href="./">← 返回终端</a>
+        <span>LanTerm / SSH</span>
       </header>
-      <h1>浏览器 SSH 隧道</h1>
-      <p>每个实例都能映射自己的 sshd，也能接收本机 SSH。连接由你手动配对。</p>
-      <p id="settings" role="status">正在读取配置…</p>
+      <h1>从本机连接远端 SSH</h1>
+      <p class="intro">用浏览器接通远端，再用本机的终端、SFTP 或开发工具连接。</p>
+      <div class="route" aria-label="连接路线">
+        <span>你的电脑</span>
+        <b>→</b>
+        <span>浏览器桥接</span>
+        <b>→</b>
+        <span>远端 SSH</span>
+      </div>
+      <p id="settings" class="caption" role="status">正在读取配置…</p>
       <form id="login" hidden>
-        <h2>登录这个 LanTerm</h2>
+        <h2>登录当前 LanTerm</h2>
         <label>
           访问密码
           <input id="password" type="password" autocomplete="current-password" required />
@@ -26,52 +33,131 @@
         <button>登录</button>
       </form>
       <section id="controls" hidden>
-        <form id="pair-form">
-          <h2>1. 在本机生成配对信息</h2>
-          <p>用本机浏览器打开本机 LanTerm 的此页面，填写远端地址。生成新配对会结束旧隧道。</p>
-          <label>
-            远端 LanTerm 地址
-            <input id="remote-url" type="url" placeholder="https://平台/.../proxy/8766/" required />
-          </label>
-          <button>生成配对信息</button>
-          <label id="pair-output" hidden>
-            配对信息（含临时凭证，请勿分享）
-            <textarea id="pair-code" readonly rows="4"></textarea>
-          </label>
-        </form>
-        <form id="connect-form">
-          <h2>2. 在远端页面接通</h2>
-          <p>
-            在同一台本机的浏览器里打开远端 LanTerm 的此页面，粘贴配对信息。平台登录态留在浏览器中。
-          </p>
-          <label>
-            本机生成的配对信息
-            <textarea
-              id="pair-input"
-              rows="4"
-              required
-              autocomplete="off"
-              spellcheck="false"
-            ></textarea>
-          </label>
-          <button id="connect">连接隧道</button>
-          <button id="rotate" type="button" disabled>模拟 WS 断线并重连</button>
-          <button id="stop" type="button" disabled>停止隧道</button>
-        </form>
-        <section class="connection">
-          <h2>连接状态</h2>
-          <p id="status" role="status">未连接</p>
-          <code id="command"></code>
-          <p>
-            保持此页面打开。WS 断线后自动续传；服务重启、配对过期或 SSH
-            自身超时会结束连接。缓冲满时暂停读取。
-          </p>
-          <p>
-            如果浏览器询问本地网络访问权限，请允许此页面连接本机。浏览器策略可能阻止 HTTPS
-            页面访问本机 WS；连接失败时会显示提示。
-          </p>
+        <div class="roles" role="group" aria-label="选择当前页面的用途">
+          <button id="role-local" type="button" aria-pressed="false">
+            <strong>本机 · 发起连接</strong>
+            <small>在你的电脑上生成配对信息</small>
+          </button>
+          <button id="role-remote" type="button" aria-pressed="false">
+            <strong>远端 · 接通连接</strong>
+            <small>已有配对信息，在这里粘贴</small>
+          </button>
+        </div>
+        <section id="local-panel" hidden>
+          <p class="hint">本机指你正在使用浏览器的电脑。两边页面都在这台电脑的浏览器里打开。</p>
+          <form id="pair-form">
+            <h2>
+              <span class="step">1</span>
+              填写要连接的远端
+            </h2>
+            <label>
+              远端 LanTerm 地址
+              <input
+                id="remote-url"
+                type="url"
+                placeholder="https://平台/.../proxy/8766/"
+                required
+              />
+            </label>
+            <p class="caption">复制远端终端页面的完整地址，保留平台的路径前缀。</p>
+            <button id="pair-submit">生成配对信息</button>
+            <p id="replace-note" class="caption" hidden>
+              当前已有配对。生成新配对会断开旧的 SSH 连接。
+            </p>
+          </form>
+          <section id="pair-output" class="card" hidden>
+            <h2>
+              <span class="step">2</span>
+              复制信息，去远端接通
+            </h2>
+            <p>先复制，再打开远端页面粘贴。如果出现平台或 LanTerm 登录页，请先登录。</p>
+            <label>
+              配对信息
+              <textarea id="pair-code" readonly rows="3" spellcheck="false"></textarea>
+            </label>
+            <div class="actions">
+              <button id="copy-pair" type="button">复制配对信息</button>
+              <a
+                id="open-remote"
+                class="button secondary"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                打开远端页面 ↗
+              </a>
+            </div>
+            <p class="caption">含临时凭证，仅粘贴到你要连接的远端页面。</p>
+          </section>
+          <section class="card">
+            <h2>
+              <span class="step">3</span>
+              接通后，回到本机终端
+            </h2>
+            <p id="local-status" role="status">等待生成配对信息。</p>
+            <p class="caption">远端页面会提供 SSH 命令。连接期间保持远端页面打开。</p>
+            <button id="revoke" class="secondary" type="button" hidden>停止本机配对</button>
+          </section>
+        </section>
+        <section id="remote-panel" hidden>
+          <p class="hint">这是要登录的远端。请保持此页面打开，它负责连接你的电脑与远端 SSH。</p>
+          <form id="connect-form">
+            <h2>
+              <span class="step">1</span>
+              粘贴本机的配对信息
+            </h2>
+            <label>
+              本机生成的配对信息
+              <textarea
+                id="pair-input"
+                rows="3"
+                required
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="在本机页面点击「复制配对信息」，然后粘贴到这里"
+              ></textarea>
+            </label>
+            <button id="connect">连接隧道</button>
+          </form>
+          <section class="connection card">
+            <h2>
+              <span class="step">2</span>
+              在本机终端登录
+            </h2>
+            <p id="status" class="status" role="status">未连接 · 请先粘贴配对信息</p>
+            <div id="command-panel" hidden>
+              <label>
+                远端 SSH 用户名
+                <input
+                  id="ssh-user"
+                  autocomplete="username"
+                  placeholder="例如 root 或你的远端账号"
+                  pattern="[a-zA-Z0-9_][a-zA-Z0-9_.-]*"
+                />
+              </label>
+              <code id="command"></code>
+              <button id="copy-command" type="button" disabled>复制 SSH 命令</button>
+              <p class="caption">
+                在你的电脑上执行。使用远端的 SSH 密码或密钥，与 LanTerm 访问密码不同。
+              </p>
+            </div>
+            <button id="stop" type="button" class="secondary" disabled>停止隧道</button>
+            <details>
+              <summary>连接帮助与诊断</summary>
+              <p>
+                如果浏览器询问本地网络访问权限，请允许。连接失败时检查本机 LanTerm
+                是否运行、远端是否已登录，以及远端 sshd 是否可用。
+              </p>
+              <p>
+                短暂断线会自动重连。关闭页面、电脑休眠或服务重启可能结束 SSH 连接；远端长任务建议在
+                tmux 中运行。
+              </p>
+              <p id="technical"></p>
+              <button id="rotate" type="button" class="secondary" disabled>测试断线重连</button>
+            </details>
+          </section>
         </section>
       </section>
+      <p id="notice" role="status"></p>
       <p id="error" role="alert"></p>
     </main>
   </body>
