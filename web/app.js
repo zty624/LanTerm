@@ -286,11 +286,9 @@ function render() {
     const icon = el('span', 'session-icon', item.pinned ? '★' : '>_');
     const info = el('span', 'session-info');
     const title = el('strong', '', item.name);
-    const detail = document.createElement('small');
-    detail.textContent = `${item.shell}${item.panes.length > 1 ? ` · ${item.panes.length} 个分屏` : ''} · ${item.status === 'exited' ? '已退出' : item.clients > 0 ? '已连接' : '后台运行'}`;
     const dot = document.createElement('span');
     dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
-    info.append(title, detail);
+    info.append(title);
     if (item.panes.length === 1) info.append(plugins.render(item.id, item.active_pane));
     if (item.tags.length) {
       const tags = el('span', 'session-tags');

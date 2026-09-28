@@ -290,12 +290,6 @@ kbd {
   font-size: 14px;
   font-weight: 550;
 }
-.session-item small {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: #9aa7b6;
-}
 .plugin-badges {
   display: grid;
   gap: 4px;
