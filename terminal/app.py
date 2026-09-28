@@ -17,6 +17,7 @@ from starlette.requests import HTTPConnection
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 from terminal.config import ASSETS, Config, available_shells
+from terminal.files import media, preview
 from terminal.inputs import Batch, Create, Login, Metadata, PaneAction, Split
 from terminal.monitor import Monitor
 from terminal.panes import Panes
@@ -103,11 +104,16 @@ def create_app(
                         if hub is not None and request.url.path.rstrip("/").endswith("/ssh")
                         else "connect-src 'self'; "
                     )
-                    + "img-src 'self' data:; font-src 'self'; "
+                    + "img-src 'self' data:; font-src 'self'; media-src 'self'; frame-src 'self'; "
                     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
                 ),
             }
         )
+        if response.headers.get("content-type") == "application/pdf":
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'"
+            )
         return response
 
     @app.exception_handler(SessionError)
@@ -237,6 +243,32 @@ def create_app(
     @api.get("/sessions/{sid}/panes")
     async def list_panes(sid: str):
         return await panes.list(sid)
+
+    @api.get("/sessions/{sid}/file")
+    async def file_preview(
+        sid: str,
+        path: Annotated[str, Field(min_length=1, max_length=4096)],
+        pane: Annotated[str, Field(pattern=r"^%\d+$", max_length=24)],
+        sheet: Annotated[str, Field(max_length=128)] = "",
+    ):
+        if any(ord(char) < 32 for char in path):
+            raise HTTPException(422, "路径不能包含控制字符")
+        await panes.target(sid, pane)
+        cwd = await sessions.run(["display-message", "-p", "-t", pane, "#{pane_current_path}"])
+        return await asyncio.to_thread(preview, path, cwd, sheet)
+
+    @api.api_route("/sessions/{sid}/file/content", methods=["GET", "HEAD"])
+    async def file_content(
+        sid: str,
+        path: Annotated[str, Field(min_length=1, max_length=4096)],
+        pane: Annotated[str, Field(pattern=r"^%\d+$", max_length=24)],
+    ):
+        await panes.target(sid, pane)
+        cwd = await sessions.run(["display-message", "-p", "-t", pane, "#{pane_current_path}"])
+        file, mime = await asyncio.to_thread(media, path, cwd)
+        return FileResponse(
+            file, media_type=mime, filename=file.name, content_disposition_type="inline"
+        )
 
     @api.post("/sessions/{sid}/panes", status_code=201)
     async def split_pane(sid: str, body: Split):

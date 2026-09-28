@@ -6,6 +6,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ResourceView } from './monitor.js';
 import { SessionStatus } from './plugins.js';
 import { PaneControls } from './panes.js';
+import { FilePreview } from './files.js';
 import { $, el, reconcile, text } from './dom.js';
 import './style.css';
 
@@ -38,6 +39,7 @@ const resources = new ResourceView(
   () => state.loggedIn,
 );
 const plugins = new SessionStatus(api, () => state.loggedIn);
+const preview = new FilePreview(api, active, report);
 const panes = new PaneControls(
   api,
   async (sid) => {
@@ -517,6 +519,7 @@ function connect() {
     }),
   );
   term.open($('terminal'));
+  preview.attach(term);
   fit();
   $('font-size').textContent = `${fontSize}px`;
   const url = new URL(`ws/${state.active}`, location.href);
@@ -815,6 +818,7 @@ bind('duplicate-session', async () => {
   toast('已按原会话的当前目录和 Shell 创建新会话');
 });
 bind('session-details', () => resources.showSession(state.active));
+bind('show-files', () => preview.open('', state.term, null));
 bind('show-panes', () => panes.open(state.active, null));
 bind('batch-mode', () => {
   state.batch = !state.batch;

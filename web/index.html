@@ -180,6 +180,7 @@
                   复制会话
                 </button>
                 <button id="session-details">会话详情</button>
+                <button id="show-files">预览文件</button>
                 <button id="show-history" title="查看 tmux 保留的完整历史">终端历史</button>
                 <button id="close-session" class="danger-subtle" title="结束此会话及其中的进程">
                   关闭会话…
@@ -319,6 +320,52 @@
         </nav>
       </section>
     </main>
+
+    <dialog id="preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
+      <div class="preview-heading">
+        <div class="preview-title-group">
+          <span id="preview-kind" class="file-type">FILE</span>
+          <div class="preview-name">
+            <h2 id="preview-title">文件预览</h2>
+            <span>只读 · LanTerm 主机</span>
+          </div>
+        </div>
+        <div class="preview-window-actions">
+          <button id="preview-maximize" aria-pressed="false">最大化</button>
+          <button data-dismiss class="icon-button" aria-label="关闭文件预览">×</button>
+        </div>
+      </div>
+      <form id="preview-form" class="preview-address">
+        <input
+          id="preview-path"
+          aria-label="文件路径"
+          placeholder="绝对路径，或相对于分屏当前目录的路径"
+          required
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="submit">打开</button>
+      </form>
+      <div class="preview-tools">
+        <button id="preview-back" disabled>← 返回</button>
+        <button id="preview-parent" disabled>上级目录</button>
+        <select id="preview-pane" aria-label="路径所在分屏"></select>
+        <a id="preview-external" target="_blank" rel="noopener noreferrer" hidden>新标签页打开 ↗</a>
+      </div>
+      <div id="preview-table-tools" class="preview-table-tools" hidden>
+        <select id="preview-sheet" aria-label="工作表"></select>
+        <input
+          id="preview-table-search"
+          type="search"
+          aria-label="搜索表格"
+          placeholder="搜索预览中的内容…"
+        />
+        <span id="preview-table-count"></span>
+      </div>
+      <p id="preview-error" class="form-error" role="alert"></p>
+      <div id="preview-content" tabindex="0" aria-label="文件内容"></div>
+      <p id="preview-note" class="monitor-note" role="status"></p>
+    </dialog>
 
     <dialog id="session-dialog">
       <form id="session-form">

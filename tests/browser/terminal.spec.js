@@ -1,6 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 import { spawn, execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -892,4 +892,240 @@ test('last terminal row stays visible above the status bar', async ({ page, serv
         .toBe(true);
     }
   }
+});
+
+test.describe('file previews behind a proxy prefix', () => {
+  test.use({ prefix: '/notebook/proxy/8766' });
+  test('printed paths, OSC links, line numbers and directories open without executing HTML', async ({
+    page,
+    service,
+  }) => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const folder = join(service.folder, 'project with spaces');
+    await mkdir(folder);
+    await writeFile(
+      join(folder, '中文.md'),
+      '# Example\n<script>window.previewInjected = true</script>\nlast line\n',
+    );
+    await writeFile(join(folder, 'simple.py'), 'print("hello")\n');
+    await writeFile(
+      join(folder, 'pixel.png'),
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jJ1kAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    );
+    await login(page, service);
+    await page.locator('#new-session').click();
+    await page.getByLabel('会话名称', { exact: true }).fill('File previews');
+    await page.getByRole('button', { name: '创建会话', exact: true }).click();
+    await expect(page.locator('#connection-status')).toHaveText('已连接');
+    const quote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
+    await run(page, `cd ${quote(folder)}`);
+    async function printed(value, column) {
+      await run(page, `printf '\\033[2J\\033[H%s\\n' ${quote(value)}`);
+      await expect(page.locator('.xterm-rows > div').first()).toContainText(value);
+      const rect = await page.locator('.xterm-screen').boundingBox();
+      const row = await page.locator('.xterm-rows > div').first().boundingBox();
+      const cols = Number((await page.locator('#terminal-size').textContent()).split(' × ')[0]);
+      await page.mouse.click(rect.x + ((column + 0.5) * rect.width) / cols, row.y + row.height / 2);
+      await expect(page.locator('#preview-dialog')).toBeVisible();
+    }
+    await printed(`查看 \`${folder}/中文.md:2\``, 10);
+    await expect(page.locator('.file-line.highlight')).toContainText('<script>');
+    await expect(page.locator('#preview-path')).toHaveValue(join(folder, '中文.md'));
+    expect(await page.evaluate(() => window.previewInjected)).toBeUndefined();
+    await page.locator('#preview-parent').click();
+    await expect(page.getByRole('button', { name: '文件 simple.py' })).toBeVisible();
+    await page.getByRole('button', { name: '文件 pixel.png' }).click();
+    await expect
+      .poll(() => page.locator('#preview-content img').evaluate((img) => img.naturalWidth))
+      .toBe(1);
+    await page.locator('#preview-back').click();
+    await page.getByRole('button', { name: '文件 simple.py' }).click();
+    await expect(page.locator('.file-code')).toContainText('print("hello")');
+    await page.screenshot({ path: '.runtime/file-preview-desktop.png' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({ path: '.runtime/file-preview-mobile.png' });
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await printed('./simple.py:1', 4);
+    await expect(page.locator('.file-line.highlight')).toHaveText('print("hello")');
+    await page.keyboard.press('Escape');
+    const uri = new URL(`file://${folder}/中文.md`).href + '#L3';
+    await run(
+      page,
+      `printf '\\033[2J\\033[H\\033]8;;%s\\033\\\\Open report\\033]8;;\\033\\\\\\n' ${quote(uri)}`,
+    );
+    await expect(page.locator('.xterm-rows > div').first()).toHaveText('Open report');
+    const rect = await page.locator('.xterm-rows > div').first().boundingBox();
+    await page.mouse.move(rect.x + 20, rect.y + rect.height * 3);
+    await page.mouse.click(rect.x + 20, rect.y + rect.height / 2);
+    await expect(page.locator('#preview-dialog')).toBeVisible();
+    await expect(page.locator('.file-line.highlight')).toHaveText('last line');
+    await page.getByLabel('文件路径', { exact: true }).fill('missing.txt');
+    await page.getByRole('button', { name: '打开', exact: true }).click();
+    await expect(page.locator('#preview-error')).toContainText('文件不存在');
+    await page.keyboard.press('Escape');
+    await run(page, "printf 'after:%s\\n' preview");
+    await expect(page.locator('.xterm-rows')).toContainText('after:preview');
+    expect(errors).toEqual([]);
+  });
+});
+
+test('relative file links use the clicked pane even when another pane is active', async ({
+  page,
+  service,
+}) => {
+  await writeFile(join(service.folder, 'preview.txt'), 'from left pane\n');
+  const other = join(service.folder, 'other');
+  await mkdir(other);
+  await writeFile(join(other, 'preview.txt'), 'from right pane\n');
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Preview panes');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await run(page, "printf '\\033[2J\\033[H%s\\n' './preview.txt'");
+  await page.locator('#show-panes').click();
+  await page.getByRole('button', { name: '左右分屏', exact: true }).click();
+  await expect(page.locator('#pane-dialog')).not.toBeVisible();
+  await run(page, "cd other; printf 'right:%s\\n' ready");
+  await expect(page.locator('.xterm-rows')).toContainText('right:ready');
+  const rows = page.locator('.xterm-rows > div');
+  const row = rows.filter({ hasText: './preview.txt' }).first();
+  await expect(row).toBeVisible();
+  const box = await row.boundingBox();
+  await page.mouse.click(box.x + 30, box.y + box.height / 2);
+  await expect(page.locator('#preview-dialog')).toBeVisible();
+  await expect(page.locator('.file-code')).toContainText('from left pane');
+  await page.keyboard.press('Escape');
+  await run(page, "printf 'right:%s\\n' active");
+  await expect(page.locator('.xterm-rows')).toContainText('right:active');
+});
+
+test.describe('rich file previews', () => {
+  test.use({ prefix: '/notebook/proxy/8766' });
+  test('tables, PDF and seekable media work in the enlarged preview', async ({ page, service }) => {
+    await exec(resolve('.venv/bin/python'), [
+      resolve('tests/fixtures/preview_files.py'),
+      service.folder,
+      '--video',
+    ]);
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await login(page, service);
+    await page.locator('#new-session').click();
+    await page.getByLabel('会话名称', { exact: true }).fill('Rich preview');
+    await page.getByRole('button', { name: '创建会话', exact: true }).click();
+    await expect(page.locator('#connection-status')).toHaveText('已连接');
+    await page.getByLabel('更多会话操作').click();
+    await page.locator('#show-files').click();
+    async function open(name) {
+      await page.getByLabel('文件路径', { exact: true }).fill(join(service.folder, name));
+      await page
+        .locator('#preview-form')
+        .getByRole('button', { name: '打开', exact: true })
+        .click();
+      await expect(page.locator('#preview-title')).toHaveText(name);
+      await expect(page.locator('#preview-error')).toBeEmpty();
+    }
+    await open('results.csv');
+    await expect(page.locator('.file-table tbody tr')).toHaveCount(4);
+    await expect(page.locator('.file-table')).toContainText('hello, world');
+    await expect(page.locator('.file-table')).toContainText('<script>alert(1)</script>');
+    await page.getByLabel('搜索表格', { exact: true }).fill('beta');
+    await expect(page.locator('.file-table tbody tr')).toHaveCount(1);
+    await expect(page.locator('#preview-table-count')).toContainText('1 / 4');
+    await page.getByLabel('搜索表格', { exact: true }).fill('');
+    await open('results.tsv');
+    await expect(page.locator('.file-table')).toContainText('任务 A');
+    await open('results.xlsx');
+    await expect(page.locator('.file-table')).toContainText('accuracy');
+    await page.getByLabel('工作表', { exact: true }).selectOption('明细');
+    await expect(page.locator('.file-table')).toContainText('=2+3');
+    const rect = await page.locator('#preview-dialog').boundingBox();
+    expect(rect.width).toBeGreaterThan(1360);
+    expect(rect.height).toBeGreaterThan(840);
+    await page.locator('#preview-maximize').click();
+    await expect(page.locator('#preview-maximize')).toHaveAttribute('aria-pressed', 'true');
+    expect((await page.locator('#preview-dialog').boundingBox()).width).toBe(1440);
+    await page.locator('#preview-maximize').click();
+    await mkdir('.runtime', { recursive: true });
+    await page.screenshot({ path: '.runtime/rich-table-desktop.png' });
+    await open('report.pdf');
+    const frame = page.locator('iframe.file-pdf');
+    await expect(frame).toBeVisible();
+    const source = await frame.getAttribute('src');
+    expect(source).toContain('/notebook/proxy/8766/api/');
+    const pdf = await page.request.get(source);
+    expect(pdf.headers()['content-type']).toBe('application/pdf');
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
+    await expect
+      .poll(async () => {
+        for (const frame of page.frames().filter((frame) => frame.url() === source)) {
+          if (await frame.locator('#sizer').count())
+            return frame.locator('#sizer').evaluate((node) => node.getBoundingClientRect().height);
+        }
+        return 0;
+      })
+      .toBeGreaterThan(0);
+    await page.screenshot({ path: '.runtime/rich-pdf-desktop.png' });
+    await open('tone.wav');
+    const audio = page.locator('audio');
+    await expect
+      .poll(() => audio.evaluate((player) => player.readyState))
+      .toBeGreaterThanOrEqual(1);
+    expect(await audio.evaluate((player) => player.duration)).toBe(3);
+    await audio.evaluate(async (player) => {
+      player.muted = true;
+      await player.play();
+    });
+    await expect.poll(() => audio.evaluate((player) => player.currentTime)).toBeGreaterThan(0);
+    await audio.evaluate((player) => {
+      player.pause();
+      player.currentTime = 2;
+    });
+    await expect.poll(() => audio.evaluate((player) => player.currentTime)).toBeCloseTo(2, 1);
+    await page.evaluate(() => {
+      window.oldAudio = document.querySelector('audio');
+    });
+    await page.screenshot({ path: '.runtime/rich-audio-desktop.png' });
+    await open('clip.webm');
+    expect(
+      await page.evaluate(() => window.oldAudio.paused && !window.oldAudio.hasAttribute('src')),
+    ).toBe(true);
+    const video = page.locator('video');
+    await expect
+      .poll(() => video.evaluate((player) => player.readyState))
+      .toBeGreaterThanOrEqual(1);
+    expect(await video.evaluate((player) => player.videoWidth)).toBe(320);
+    await video.evaluate(async (player) => {
+      player.muted = true;
+      await player.play();
+    });
+    await expect.poll(() => video.evaluate((player) => player.currentTime)).toBeGreaterThan(0);
+    await video.evaluate((player) => {
+      player.pause();
+      player.currentTime = 1.5;
+    });
+    await expect.poll(() => video.evaluate((player) => !player.seeking)).toBe(true);
+    await page.screenshot({ path: '.runtime/rich-video-desktop.png' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({ path: '.runtime/rich-video-mobile.png' });
+    await open('results.xlsx');
+    await expect(page.locator('.file-table')).toContainText('accuracy');
+    await page.screenshot({ path: '.runtime/rich-table-mobile.png' });
+    await page.getByRole('button', { name: '关闭文件预览', exact: true }).click();
+    await run(page, "printf 'preview:%s\\n' done");
+    await expect(page.locator('.xterm-rows')).toContainText('preview:done');
+    expect(errors).toEqual([]);
+  });
 });

@@ -155,6 +155,8 @@ class Terminal:
                     sys.executable,
                     str(ROOT / "terminal/attach.py"),
                     *self.sessions.cmd,
+                    "-T",
+                    "RGB,hyperlinks",
                     "attach-session",
                     "-t",
                     f"lt-{self.sid}",
