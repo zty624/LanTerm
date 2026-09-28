@@ -184,6 +184,7 @@ export class FilePreview {
         .filter((p) => p.visible)
         .map((p) => new Option(`${p.id} · ${p.command || item.shell}`, p.id)),
     );
+    $('preview-pane').hidden = $('preview-pane').options.length < 2;
     let pane = item.active_pane;
     if (point && term) {
       const x = point.x - 1;

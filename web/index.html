@@ -327,15 +327,36 @@
           <span id="preview-kind" class="file-type">FILE</span>
           <div class="preview-name">
             <h2 id="preview-title">文件预览</h2>
-            <span>只读 · LanTerm 主机</span>
           </div>
         </div>
         <div class="preview-window-actions">
+          <a
+            id="preview-external"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="在新标签页打开"
+            aria-label="在新标签页打开"
+            hidden
+          >
+            ↗
+          </a>
           <button id="preview-maximize" aria-pressed="false">最大化</button>
           <button data-dismiss class="icon-button" aria-label="关闭文件预览">×</button>
         </div>
       </div>
       <form id="preview-form" class="preview-address">
+        <button
+          id="preview-back"
+          type="button"
+          aria-label="返回上一个文件"
+          title="返回上一个文件"
+          disabled
+        >
+          ←
+        </button>
+        <button id="preview-parent" type="button" aria-label="上级目录" title="上级目录" disabled>
+          ↑
+        </button>
         <input
           id="preview-path"
           aria-label="文件路径"
@@ -344,14 +365,9 @@
           autocomplete="off"
           spellcheck="false"
         />
+        <select id="preview-pane" aria-label="路径所在分屏" title="相对路径所在分屏"></select>
         <button type="submit">打开</button>
       </form>
-      <div class="preview-tools">
-        <button id="preview-back" disabled>← 返回</button>
-        <button id="preview-parent" disabled>上级目录</button>
-        <select id="preview-pane" aria-label="路径所在分屏"></select>
-        <a id="preview-external" target="_blank" rel="noopener noreferrer" hidden>新标签页打开 ↗</a>
-      </div>
       <div id="preview-table-tools" class="preview-table-tools" hidden>
         <select id="preview-sheet" aria-label="工作表"></select>
         <input

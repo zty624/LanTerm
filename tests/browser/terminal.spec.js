@@ -1049,8 +1049,8 @@ test.describe('rich file previews', () => {
     await page.getByLabel('工作表', { exact: true }).selectOption('明细');
     await expect(page.locator('.file-table')).toContainText('=2+3');
     const rect = await page.locator('#preview-dialog').boundingBox();
-    expect(rect.width).toBeGreaterThan(1360);
-    expect(rect.height).toBeGreaterThan(840);
+    expect(rect.width).toBeGreaterThan(1420);
+    expect(rect.height).toBeGreaterThan(880);
     await page.locator('#preview-maximize').click();
     await expect(page.locator('#preview-maximize')).toHaveAttribute('aria-pressed', 'true');
     expect((await page.locator('#preview-dialog').boundingBox()).width).toBe(1440);
@@ -1058,6 +1058,7 @@ test.describe('rich file previews', () => {
     await mkdir('.runtime', { recursive: true });
     await page.screenshot({ path: '.runtime/rich-table-desktop.png' });
     await open('report.pdf');
+    expect((await page.locator('#preview-content').boundingBox()).height).toBeGreaterThan(740);
     const frame = page.locator('iframe.file-pdf');
     await expect(frame).toBeVisible();
     const source = await frame.getAttribute('src');
@@ -1119,6 +1120,9 @@ test.describe('rich file previews', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    const mobile = await page.locator('#preview-dialog').boundingBox();
+    expect(mobile.width).toBe(390);
+    expect(mobile.height).toBe(844);
     await page.screenshot({ path: '.runtime/rich-video-mobile.png' });
     await open('results.xlsx');
     await expect(page.locator('.file-table')).toContainText('accuracy');

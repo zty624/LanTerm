@@ -661,11 +661,11 @@ dialog::backdrop {
   backdrop-filter: blur(3px);
 }
 .preview-dialog {
-  width: calc(100vw - 40px);
+  width: calc(100vw - 16px);
   max-width: none;
-  height: calc(100dvh - 40px);
+  height: calc(100dvh - 16px);
   max-height: none;
-  padding: 18px 22px 12px;
+  padding: 10px 12px 8px;
   background: #171d25;
   border-color: #3b4755;
   border-radius: 14px;
@@ -702,17 +702,11 @@ dialog::backdrop {
   text-overflow: ellipsis;
   letter-spacing: 0;
 }
-.preview-name > span {
-  display: block;
-  color: #8797a5;
-  font-size: 11px;
-  margin-top: 4px;
-}
 .file-type {
   flex-shrink: 0;
-  padding: 10px 8px;
-  min-width: 48px;
-  border-radius: 8px;
+  padding: 5px 7px;
+  min-width: 42px;
+  border-radius: 5px;
   text-align: center;
   background: #27392f;
   color: #a1dfb9;
@@ -730,47 +724,58 @@ dialog::backdrop {
   padding: 6px 9px;
   background: transparent;
 }
-.preview-address,
-.preview-tools {
+.preview-address {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 10px;
   flex-shrink: 0;
 }
 .preview-address input {
   min-width: 0;
   flex: 1;
-  padding: 9px 12px;
+  height: 34px;
+  padding: 7px 10px;
   font:
-    13px ui-monospace,
+    12px ui-monospace,
     monospace;
   border-color: #35414e;
 }
 .preview-address button {
-  padding: 8px 16px;
-}
-.preview-tools {
-  margin: 8px 0 12px;
-  align-items: center;
-}
-.preview-tools select {
-  min-width: 0;
-  width: 170px;
-}
-.preview-tools button,
-.preview-tools select {
+  height: 34px;
+  padding: 6px 10px;
+  flex-shrink: 0;
   font-size: 12px;
-  padding: 6px 9px;
 }
-.preview-tools button {
+#preview-back,
+#preview-parent {
+  width: 32px;
+  padding: 4px;
+  color: #aebeb4;
+  font-size: 18px;
+  background: transparent;
+  border-color: transparent;
+}
+#preview-back:hover,
+#preview-parent:hover {
+  background: #29342e;
+}
+#preview-pane {
+  width: 125px;
+  height: 34px;
+  padding: 6px 8px;
+  font-size: 12px;
   flex-shrink: 0;
 }
 #preview-external {
-  margin-left: auto;
-  font-size: 12px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  font-size: 20px;
   color: #a1d4b7;
   text-decoration: none;
-  white-space: nowrap;
 }
 #preview-external:hover {
   text-decoration: underline;
@@ -779,7 +784,7 @@ dialog::backdrop {
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
   border-bottom: 0;
   border-radius: 7px 7px 0 0;
@@ -830,7 +835,7 @@ dialog::backdrop {
   overflow: hidden;
 }
 #preview-note {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: #8fa0ae;
   font-size: 11px;
   line-height: 1.5;
@@ -958,42 +963,54 @@ dialog::backdrop {
 }
 @media (max-width: 700px) {
   .preview-dialog {
-    width: calc(100vw - 16px);
-    height: calc(100dvh - 16px);
-    padding: 12px;
-    border-radius: 10px;
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    padding: 8px;
+    border: 0;
+    border-radius: 0;
   }
   .preview-heading,
   .preview-title-group {
-    gap: 8px;
+    gap: 7px;
   }
   .preview-name h2 {
     font-size: 15px;
   }
   .file-type {
-    min-width: 42px;
-    padding: 10px 5px;
+    min-width: 38px;
+    padding: 5px;
     font-size: 10px;
   }
-  .preview-tools {
+  .preview-window-actions {
+    gap: 3px;
+  }
+  #preview-maximize {
+    display: none;
+  }
+  .preview-address {
     flex-wrap: wrap;
+    gap: 4px;
   }
-  .preview-tools select {
-    flex: 1;
-    width: 100px;
+  .preview-address input {
+    flex-basis: calc(100% - 125px);
   }
-  #preview-external {
-    margin-left: 0;
+  #preview-pane {
+    order: 1;
+    width: 100%;
   }
   .preview-table-tools {
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
   }
   .preview-table-tools select {
-    width: 100%;
+    width: 110px;
+  }
+  .preview-table-tools input {
+    max-width: none;
   }
   #preview-table-count {
-    font-size: 11px;
+    font-size: 10px;
   }
   .media-stage {
     padding: 14px;
