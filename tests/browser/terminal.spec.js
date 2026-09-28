@@ -845,3 +845,33 @@ test('compact controls preserve terminal input and work on narrow screens', asyn
   await run(page, "printf 'input:%s\\n' preserved");
   await expect(page.locator('.xterm-rows')).toContainText('input:preserved');
 });
+
+test('last terminal row stays visible above the status bar', async ({ page, service }) => {
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Terminal bounds');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await run(page, "PS1='LAST_ROW_VISIBLE'");
+  for (const size of [
+    { width: 1440, height: 900 },
+    { width: 1200, height: 760 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(size);
+    for (const control of ['#zoom-in', '#zoom-out', '#show-keys']) {
+      await page.locator(control).click();
+      // Fill real tmux scrollback so the prompt occupies the terminal's last row.
+      await run(page, "printf 'row\\n%.0s' {1..100}");
+      await expect(page.locator('.xterm-rows > div').last()).toContainText('LAST_ROW_VISIBLE');
+      await expect
+        .poll(async () => {
+          const row = await page.locator('.xterm-rows > div').last().boundingBox();
+          const terminal = await page.locator('#terminal').boundingBox();
+          const status = await page.locator('.statusbar').boundingBox();
+          return row.y + row.height <= Math.min(terminal.y + terminal.height, status.y) + 0.5;
+        })
+        .toBe(true);
+    }
+  }
+});

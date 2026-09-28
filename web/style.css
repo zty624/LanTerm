@@ -532,7 +532,8 @@ kbd {
   display: none;
 }
 #terminal {
-  padding: 12px 8px 0 14px;
+  /* FitAddon measures this box; keep its interior free of padding and borders. */
+  margin: 12px 8px 0 14px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1561,8 +1562,8 @@ textarea {
     right: 0;
   }
   #terminal {
-    padding-left: 6px;
-    padding-right: 2px;
+    margin-left: 6px;
+    margin-right: 2px;
   }
   .keybar {
     display: flex;
