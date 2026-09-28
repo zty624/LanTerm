@@ -1133,3 +1133,159 @@ test.describe('rich file previews', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('developer file previews', () => {
+  test.use({ prefix: '/notebook/proxy/8766' });
+  test('Markdown math and diagrams, JSON trees and code tools work without executing content', async ({
+    page,
+    service,
+    context,
+  }) => {
+    const markdown = [
+      '# Agent 工作记录',
+      '',
+      '这是 **Markdown 预览**，包含公式 $E=mc^2$。',
+      '',
+      '| 项目 | 结果 |',
+      '| --- | --- |',
+      '| accuracy | 0.95 |',
+      '',
+      '- [x] 完成训练',
+      '- [ ] 检查输出',
+      '',
+      '```python',
+      'def train(steps):',
+      '    return steps + 1',
+      '```',
+      '',
+      '```mermaid',
+      'flowchart LR',
+      '  A[Start] --> B[Train]',
+      '  B --> C[Review]',
+      '```',
+      '',
+      '$$',
+      '\\mathcal{L}=\\frac{1}{N}\\sum_i (x_i-y_i)^2',
+      '$$',
+      '',
+      '[配置文件](./config.json)',
+      '',
+      '![local pixel](./pixel.png)',
+      '',
+      '<script>window.markdownExecuted = true</script>',
+      '[unsafe](javascript:alert(1))',
+      '',
+    ].join('\n');
+    await writeFile(join(service.folder, 'README.md'), markdown);
+    await writeFile(
+      join(service.folder, 'config.json'),
+      '{"id":900719925474099312345,"enabled":true,"nested":{"name":"training"},"items":[1,2,3]}',
+    );
+    await writeFile(
+      join(service.folder, 'config.jsonc'),
+      '// keep this comment\n{ "name": "dev", "enabled": true, }',
+    );
+    await writeFile(join(service.folder, 'events.jsonl'), '{"step":1}\n{"step":2}\n');
+    await writeFile(join(service.folder, 'broken.json'), '{"broken": }');
+    await writeFile(
+      join(service.folder, 'demo.py'),
+      'def train(steps):\n    """First line\n    Second line"""\n    return steps + 1\n',
+    );
+    await writeFile(
+      join(service.folder, 'unsafe.js'),
+      'window.codeExecuted = true;\nconst value = "<script>unsafe</script>";\n',
+    );
+    await writeFile(
+      join(service.folder, 'pixel.png'),
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jJ1kAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    );
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const chunks = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/chunks/')) chunks.push(request.url());
+    });
+    await login(page, service);
+    await page.locator('#new-session').click();
+    await page.getByLabel('会话名称', { exact: true }).fill('Developer preview');
+    await page.getByRole('button', { name: '创建会话', exact: true }).click();
+    await expect(page.locator('#connection-status')).toHaveText('已连接');
+    expect(chunks.some((url) => /developer-|diagrams-/.test(url))).toBe(false);
+    await page.getByLabel('更多会话操作').click();
+    await page.locator('#show-files').click();
+    async function open(name) {
+      await page.getByLabel('文件路径', { exact: true }).fill(join(service.folder, name));
+      await page
+        .locator('#preview-form')
+        .getByRole('button', { name: '打开', exact: true })
+        .click();
+      await expect(page.locator('#preview-title')).toHaveText(name.split(':')[0]);
+      await expect(page.locator('#preview-text-tools')).toBeVisible();
+    }
+    await open('README.md');
+    await expect(page.locator('.markdown-view h1')).toHaveText('Agent 工作记录');
+    await expect(page.locator('.markdown-view table')).toContainText('0.95');
+    await expect(page.locator('.markdown-view .katex')).toHaveCount(2);
+    await expect(page.locator('.markdown-view .hljs-keyword').first()).toHaveText('def');
+    await expect(page.locator('.mermaid-diagram svg')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('.mermaid-diagram')).toContainText('Review');
+    await expect(page.locator('.markdown-view img')).toBeVisible();
+    expect(await page.evaluate(() => window.markdownExecuted)).toBeUndefined();
+    expect(
+      await page.locator('.markdown-view a').filter({ hasText: 'unsafe' }).getAttribute('href'),
+    ).toBeNull();
+    await page.screenshot({ path: '.runtime/markdown-preview.png', fullPage: true });
+    await page.getByLabel('预览模式', { exact: true }).selectOption('source');
+    await expect(page.locator('.file-code')).toContainText('```mermaid');
+    await page.getByLabel('预览模式', { exact: true }).selectOption('markdown');
+    await page.locator('.markdown-view a').filter({ hasText: '配置文件' }).click();
+    await expect(page.locator('.json-tree')).toContainText('900719925474099312345');
+    const branch = page.locator('.json-branch > summary').filter({ hasText: 'nested' });
+    await branch.click();
+    await expect(page.locator('.json-leaf').filter({ hasText: 'training' })).toBeVisible();
+    await page.screenshot({ path: '.runtime/json-preview.png' });
+    await page.locator('#preview-collapse-json').click();
+    await expect(page.locator('.json-leaf').filter({ hasText: 'training' })).toBeHidden();
+    await page.locator('#preview-expand-json').click();
+    await page.getByLabel('预览模式', { exact: true }).selectOption('pretty');
+    await expect(page.locator('.file-code')).toContainText('900719925474099312345');
+    await expect(page.locator('.file-line')).toHaveCount(12);
+    await open('config.jsonc');
+    await expect(page.locator('.json-tree')).toContainText('dev');
+    await page.getByLabel('预览模式', { exact: true }).selectOption('pretty');
+    await expect(page.locator('.file-code')).toContainText('// keep this comment');
+    await open('events.jsonl');
+    await expect(page.locator('.json-tree > details > summary')).toContainText('2 项');
+    await open('broken.json');
+    await expect(page.locator('#preview-render-note')).toContainText('JSON 第 1 行');
+    await expect(page.locator('.file-code')).toContainText('{"broken": }');
+    await open('demo.py:3');
+    await expect(page.locator('.file-line.highlight')).toContainText('Second line');
+    await expect(page.locator('.file-line.highlight .hljs-string')).toContainText('Second line');
+    await page.getByLabel('搜索当前视图', { exact: true }).fill('return');
+    await expect(page.locator('#preview-match-count')).toHaveText('1 / 1');
+    await expect(page.locator('.search-current')).toContainText('return steps');
+    await page.locator('#preview-wrap').click();
+    await expect(page.locator('#preview-wrap')).toHaveAttribute('aria-pressed', 'true');
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.locator('#preview-copy').click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+      'def train(steps):',
+    );
+    await open('unsafe.js');
+    await expect(page.locator('.hljs-keyword').first()).toHaveText('const');
+    expect(await page.evaluate(() => window.codeExecuted)).toBeUndefined();
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({ path: '.runtime/code-preview-mobile.png' });
+    await page.getByRole('button', { name: '关闭文件预览', exact: true }).click();
+    await run(page, "printf 'developer:%s\\n' ready");
+    await expect(page.locator('.xterm-rows')).toContainText('developer:ready');
+    expect(errors).toEqual([]);
+  });
+});

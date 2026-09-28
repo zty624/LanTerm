@@ -80,6 +80,7 @@ export class FilePreview {
     this.history = [];
     this.sheet = '';
     this.table = null;
+    this.developer = null;
     $('preview-form').addEventListener('submit', (event) => {
       event.preventDefault();
       const raw = $('preview-path').value;
@@ -116,6 +117,7 @@ export class FilePreview {
   }
 
   clear() {
+    this.developer?.clear();
     for (const player of $('preview-content').querySelectorAll('audio, video')) {
       player.pause();
       player.removeAttribute('src');
@@ -299,19 +301,17 @@ export class FilePreview {
         if (!data.entries.length) list.append(el('p', '', '空目录'));
         content.append(list);
       } else {
-        const all = data.content.split('\n');
-        const code = el('pre', 'file-code');
-        const lines = all.slice(0, 5000);
-        for (const [index, text] of lines.entries()) {
-          const row = el('span', 'file-line', text || ' ');
-          row.dataset.line = index + 1;
-          if (index + 1 === line) row.classList.add('highlight');
-          code.append(row);
-        }
-        content.append(code);
-        if (all.length > 5000) $('preview-note').textContent += ' · 仅显示前 5000 行';
-        if (line > lines.length) $('preview-note').textContent += ` · 第 ${line} 行超出预览范围`;
-        code.querySelector('.highlight')?.scrollIntoView({ block: 'center' });
+        const { DeveloperPreview } = await import('./developer.js');
+        if (generation !== this.generation) return;
+        if (!this.developer)
+          this.developer = new DeveloperPreview(
+            (path, line) => this.load(path, line),
+            (path, signal) => {
+              const params = new URLSearchParams({ path, pane: $('preview-pane').value });
+              return this.api(`/sessions/${this.sid}/file?${params}`, 'GET', undefined, signal);
+            },
+          );
+        this.developer.show(data, line);
       }
     } catch (error) {
       if (generation !== this.generation || error.name === 'AbortError') return;

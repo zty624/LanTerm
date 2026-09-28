@@ -7,7 +7,7 @@
     <title>LanTerm</title>
     <link rel="icon" type="image/svg+xml" href="static/lantern.svg" />
     <link rel="stylesheet" href="static/app.css" />
-    <script defer src="static/app.js"></script>
+    <script type="module" src="static/app.js"></script>
   </head>
   <body>
     <section id="login-screen" class="login-screen">
@@ -379,6 +379,24 @@
         <span id="preview-table-count"></span>
       </div>
       <p id="preview-error" class="form-error" role="alert"></p>
+      <div id="preview-text-tools" class="preview-text-tools" hidden>
+        <select id="preview-mode" aria-label="预览模式"></select>
+        <select id="preview-language" aria-label="代码语言"></select>
+        <button id="preview-expand-json" hidden>展开一层</button>
+        <button id="preview-collapse-json" hidden>折叠全部</button>
+        <input
+          id="preview-text-search"
+          type="search"
+          aria-label="搜索当前视图"
+          placeholder="搜索当前视图…"
+        />
+        <span id="preview-match-count" aria-live="polite"></span>
+        <button id="preview-match-prev" aria-label="上一个文件匹配" disabled>↑</button>
+        <button id="preview-match-next" aria-label="下一个文件匹配" disabled>↓</button>
+        <button id="preview-wrap" aria-pressed="false">自动换行</button>
+        <button id="preview-copy">复制源码</button>
+      </div>
+      <p id="preview-render-note" class="render-note" role="status" hidden></p>
       <div id="preview-content" tabindex="0" aria-label="文件内容"></div>
       <p id="preview-note" class="monitor-note" role="status"></p>
     </dialog>

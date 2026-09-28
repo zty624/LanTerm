@@ -8,7 +8,12 @@ await build({
   bundle: true,
   minify: true,
   sourcemap: false,
-  outfile: `${output}/app.js`,
+  outdir: output,
+  format: 'esm',
+  splitting: true,
+  chunkNames: 'chunks/[name]-[hash]',
+  assetNames: 'assets/[name]-[hash]',
+  loader: { '.woff2': 'file', '.woff': 'file', '.ttf': 'file' },
   target: ['es2022'],
   legalComments: 'linked',
 });
