@@ -323,6 +323,24 @@ test('pane sidebar keeps Codex badges aligned and rejects a stale close target',
   await send(first, 'w');
   await expect(leftRow.locator('.plugin-badge')).toHaveText('Codex · Working · 工作中');
   await expect(rightRow.locator('.plugin-badge')).toHaveText('Codex · 等待输入');
+  const toggle = page.locator(`[data-collapse-session="${item.id}"]`);
+  await toggle.click();
+  await expect(rows).toBeHidden();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await page.locator(`[data-session-id="${item.id}"]`).click();
+  await expect(rows).toBeHidden();
+  await send(first, 'a');
+  await expect(leftRow.locator('.plugin-badge')).toHaveText('Codex · 等待确认 / 输入');
+  expect(sockets).toBe(1);
+  await page.reload();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await expect(rows).toBeHidden();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.focus();
+  await page.keyboard.press('Space');
+  await expect(rows).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(leftRow.locator('.plugin-badge')).toHaveText('Codex · 等待确认 / 输入');
   await leftRow.locator('.pane-switch').click();
   await expect.poll(async () => (await listing()).active).toBe(first);
   await page.keyboard.press('a');
@@ -360,7 +378,7 @@ test('pane sidebar keeps Codex badges aligned and rejects a stale close target',
   await expect(page.locator('#session-list .plugin-badge')).toHaveCount(0);
   await run(page, "printf 'restarted:%s\\n' ready");
   await expect(page.locator('.xterm-rows')).toContainText('restarted:ready');
-  expect(sockets).toBe(1);
+  expect(sockets).toBe(2);
   expect(errors).toEqual([]);
 });
 

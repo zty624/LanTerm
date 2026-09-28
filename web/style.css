@@ -224,16 +224,6 @@ kbd {
   background: #24332e;
   color: var(--accent);
 }
-.section-label {
-  display: flex;
-  justify-content: space-between;
-  color: #808997;
-  margin: 12px 16px 10px;
-  font-size: 12px;
-}
-#session-count {
-  font-family: monospace;
-}
 .new-session {
   min-height: 36px;
   display: flex;
@@ -831,6 +821,16 @@ textarea {
   width: 14px;
   flex-shrink: 0;
   accent-color: var(--accent);
+}
+.pane-toggle {
+  flex-shrink: 0;
+  width: 26px;
+  min-height: 32px;
+  padding: 4px;
+  background: transparent;
+  border-color: transparent;
+  color: #95a99e;
+  font-size: 17px;
 }
 .session-item .session-tags {
   display: flex;

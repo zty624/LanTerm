@@ -27,6 +27,7 @@ const state = {
   view: 'terminal',
   batch: false,
   selected: new Set(),
+  collapsed: new Set((localStorage.getItem('lt-collapsed-panes') || '').split(',').filter(Boolean)),
   batchIds: [],
   batchAction: '',
 };
@@ -312,9 +313,29 @@ function render() {
     fragment.append(row);
     if (item.panes.length > 1) {
       const group = el('div', 'session-panes');
+      group.id = `panes-${item.id}`;
       group.dataset.paneSession = item.id;
       group.setAttribute('role', 'group');
       group.setAttribute('aria-label', `${item.name} 的分屏`);
+      const toggle = el('button', 'pane-toggle');
+      toggle.dataset.collapseSession = item.id;
+      toggle.setAttribute('aria-controls', group.id);
+      const sync = () => {
+        group.hidden = state.collapsed.has(item.id);
+        toggle.textContent = group.hidden ? '▸' : '▾';
+        toggle.setAttribute('aria-expanded', String(!group.hidden));
+        toggle.setAttribute('aria-label', `${group.hidden ? '展开' : '折叠'} ${item.name} 的分屏`);
+        toggle.title = `${group.hidden ? '展开' : '折叠'}分屏`;
+      };
+      toggle.addEventListener('click', () => {
+        if (state.collapsed.has(item.id)) state.collapsed.delete(item.id);
+        else state.collapsed.add(item.id);
+        state.collapsed = new Set([...state.collapsed].filter((id) => ids.has(id)));
+        localStorage.setItem('lt-collapsed-panes', [...state.collapsed].join(','));
+        sync();
+      });
+      sync();
+      row.append(toggle);
       fragment.append(group);
     }
   }
@@ -323,9 +344,6 @@ function render() {
     fragment.append(empty);
   }
   $('session-list').replaceChildren(fragment);
-  $('session-count').textContent = filters
-    ? `${visible.length} / ${state.sessions.length}`
-    : String(state.sessions.length);
   $('batch-tools').hidden = !state.batch;
   $('selected-count').textContent = `已选 ${state.selected.size}`;
   $('batch-mode').textContent = state.batch ? '退出批量' : '批量管理';
