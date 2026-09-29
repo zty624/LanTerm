@@ -131,6 +131,30 @@ test('browser pairs two instances and preserves TCP over WS interruption', async
     );
     await login(remotePage, remote, 'remote');
     await expect(remotePage.locator('#pair-form')).toBeHidden();
+    // Cookies are sent to the target on the same site even from another port.
+    // The remote endpoint must reject that page's Origin before accepting WS.
+    expect(
+      await localPage.evaluate(
+        (url) =>
+          new Promise((resolve, reject) => {
+            const ws = new WebSocket(`${url.replace(/^http/, 'ws')}/ssh/bridge/remote`);
+            const timer = setTimeout(() => {
+              ws.close();
+              reject(new Error('Cross-origin WebSocket did not finish'));
+            }, 5000);
+            ws.onopen = () => {
+              clearTimeout(timer);
+              ws.close();
+              resolve(true);
+            };
+            ws.onclose = () => {
+              clearTimeout(timer);
+              resolve(false);
+            };
+          }),
+        remote.url,
+      ),
+    ).toBe(false);
     const wrong = JSON.parse(pair);
     wrong.remote = `${remote.url}/other/ssh`;
     await remotePage.locator('#pair-input').fill(JSON.stringify(wrong));

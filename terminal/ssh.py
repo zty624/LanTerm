@@ -25,6 +25,7 @@ class Hello(BaseModel):
 
 def install(app: FastAPI, auth, hub: Tunnels) -> None:
     api = APIRouter(prefix="/api/ssh", dependencies=[Depends(auth.require)])
+    public = urlsplit(auth.config.public_url)
 
     @app.get("/ssh")
     async def page():
@@ -70,9 +71,14 @@ def install(app: FastAPI, auth, hub: Tunnels) -> None:
         if side not in ("local", "remote"):
             await ws.close(1008)
             return
-        if side == "remote" and not auth.valid(ws):
-            await ws.close(1008)
-            return
+        if side == "remote":
+            url = public if public.netloc else urlsplit(str(ws.url))
+            scheme = "https" if url.scheme in ("https", "wss") else "http"
+            host = url.netloc.lower().removesuffix(":443" if scheme == "https" else ":80")
+            origin = f"{scheme}://{host}"
+            if not auth.valid(ws) or ws.headers.get("origin") != origin:
+                await ws.close(1008)
+                return
         if side == "local" and (
             ws.client.host not in ("127.0.0.1", "::1")
             or not hub.key

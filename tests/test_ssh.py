@@ -5,6 +5,7 @@ import pwd
 import secrets
 import shutil
 import socket
+import struct
 import tempfile
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -20,8 +21,10 @@ from terminal.config import Config
 
 
 @asynccontextmanager
-async def service(path, target, ttl):
-    config = Config(path, path, shutil.which("bash"), secrets.token_urlsafe(24), 8, "lt_ssh", "")
+async def service(path, target, ttl, public_url=""):
+    config = Config(
+        path, path, shutil.which("bash"), secrets.token_urlsafe(24), 8, "lt_ssh", public_url
+    )
     app = create_app(config, [], (target, 0, ttl))
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
@@ -336,3 +339,127 @@ async def test_stop_releases_blocked_tcp_and_invalid_packets_end_tunnel(pair):
     async with asyncio.timeout(3):
         while not pair.local[0].state.tunnels.local.closed:
             await asyncio.sleep(0.01)
+
+
+@pytest.mark.parametrize("public_url", ["", "https://terminal.example:443/notebook/proxy/8766/"])
+async def test_remote_origin_rejected_before_creating_tunnel(tmp_path, public_url):
+    async with service(tmp_path, 22, 30, public_url) as remote:
+        origin = "https://terminal.example" if public_url else str(remote[1].base_url).rstrip("/")
+        cookie = "; ".join(f"{key}={value}" for key, value in remote[1].cookies.items())
+        for wrong in [None, "null", "https://evil.example", origin + ".evil", origin + "/"]:
+            with pytest.raises(InvalidStatus):
+                async with connect(
+                    f"{remote[2]}/ssh/bridge/remote",
+                    origin=wrong,
+                    additional_headers={"Cookie": cookie, "X-Forwarded-Host": "evil.example"},
+                ):
+                    pass
+        assert not remote[0].state.tunnels.remote
+        async with connect(
+            f"{remote[2]}/ssh/bridge/remote", origin=origin, additional_headers={"Cookie": cookie}
+        ) as ws:
+            await ws.send(json.dumps({"id": secrets.token_urlsafe(24)}))
+            assert json.loads(await ws.recv()) == {"ready": True}
+
+
+async def test_connection_churn_during_disconnect_preserves_capacity(pair):
+    await pair.start()
+    reader, writer = await asyncio.open_connection("127.0.0.1", pair.pair["port"])
+    writer.write(b"before")
+    assert await asyncio.wait_for(reader.readexactly(6), 3) == b"before"
+    await pair.cut()
+    try:
+        for _ in range(70):
+            _, client = await asyncio.open_connection("127.0.0.1", pair.pair["port"])
+            client.get_extra_info("socket").setsockopt(
+                socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+            )
+            client.transport.abort()
+            await asyncio.sleep(0.005)
+        await pair.start()
+        async with asyncio.timeout(5):
+            while pair.local[0].state.tunnels.local.pending:
+                await asyncio.sleep(0.01)
+        writer.write(b"survived")
+        assert await asyncio.wait_for(reader.readexactly(8), 3) == b"survived"
+        next_reader, next_writer = await asyncio.open_connection("127.0.0.1", pair.pair["port"])
+        try:
+            next_writer.write(b"new connection")
+            assert await asyncio.wait_for(next_reader.readexactly(14), 3) == b"new connection"
+        finally:
+            next_writer.close()
+            await next_writer.wait_closed()
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
+@pytest.mark.parametrize("data", ["非ASCII", "!!!!"])
+async def test_invalid_base64_closes_live_tcp(pair, data):
+    await pair.start()
+    reader, writer = await asyncio.open_connection("127.0.0.1", pair.pair["port"])
+    writer.write(b"alive")
+    assert await asyncio.wait_for(reader.readexactly(5), 3) == b"alive"
+    await pair.cut()
+    link = pair.local[0].state.tunnels.local
+    try:
+        async with connect(
+            f"{pair.local[2]}/ssh/bridge/local", origin=str(pair.remote[1].base_url).rstrip("/")
+        ) as ws:
+            await ws.send(json.dumps({"id": pair.pair["id"], "key": pair.pair["key"]}))
+            assert json.loads(await ws.recv()) == {"ready": True}
+            await ws.send(
+                json.dumps(
+                    {"ack": link.tx, "seq": link.rx + 1, "op": "data", "channel": 1, "data": data}
+                )
+            )
+            assert await asyncio.wait_for(reader.read(), 3) == b""
+            assert link.closed
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
+async def test_control_overflow_from_tcp_reader_cleans_up(tmp_path):
+    peers = []
+    server = await asyncio.start_server(
+        lambda reader, writer: peers.append((reader, writer)), "127.0.0.1", 0
+    )
+    try:
+        async with service(tmp_path, server.sockets[0].getsockname()[1], 30) as remote:
+            cookie = "; ".join(f"{key}={value}" for key, value in remote[1].cookies.items())
+            async with connect(
+                f"{remote[2]}/ssh/bridge/remote",
+                origin=str(remote[1].base_url).rstrip("/"),
+                additional_headers={"Cookie": cookie},
+            ) as ws:
+                await ws.send(json.dumps({"id": secrets.token_urlsafe(24)}))
+                assert json.loads(await ws.recv()) == {"ready": True}
+                # Keep 16 target streams open, then fill the reply queue with 95
+                # resets by exceeding the stream limit without acknowledging them.
+                for seq in range(1, 112):
+                    await ws.send(json.dumps({"ack": 0, "seq": seq, "op": "open", "channel": seq}))
+                link = next(iter(remote[0].state.tunnels.remote.values()))
+                async with asyncio.timeout(3):
+                    while link.rx != 111:
+                        await asyncio.sleep(0.01)
+                # EOF makes a tracked TCP reader overflow the queue. Cleanup must
+                # not cancel/await itself or leave the other TCP streams behind.
+                for _, writer in peers:
+                    writer.write_eof()
+                async with asyncio.timeout(3):
+                    with pytest.raises(ConnectionClosed):
+                        while True:
+                            await ws.recv()
+                    while link.tasks:
+                        await asyncio.sleep(0.01)
+                assert link.closed
+                assert not link.streams
+                for reader, _ in peers:
+                    assert await asyncio.wait_for(reader.read(), 3) == b""
+    finally:
+        for _, writer in peers:
+            writer.close()
+            await writer.wait_closed()
+        server.close()
+        await server.wait_closed()

@@ -2,7 +2,6 @@
 
 import asyncio
 import base64
-import binascii
 import logging
 import secrets
 import time
@@ -67,18 +66,21 @@ class Tunnel:
             await self.space.wait_for(
                 lambda: self.closed or op != "data" or len(self.pending) < WINDOW
             )
-            if len(self.pending) >= WINDOW + CHANNELS * 4:
-                raise ProtocolError("Control queue full")
             if self.closed:
                 return
-            self.tx += 1
-            self.pending[self.tx] = {
-                "seq": self.tx,
-                "op": op,
-                "channel": channel,
-                "data": base64.b64encode(data).decode("ascii"),
-            }
-            self.changed.set()
+            if len(self.pending) < WINDOW + CHANNELS * 4:
+                self.tx += 1
+                self.pending[self.tx] = {
+                    "seq": self.tx,
+                    "op": op,
+                    "channel": channel,
+                    "data": base64.b64encode(data).decode("ascii"),
+                }
+                self.changed.set()
+                return
+        # Release the condition before closing: close() wakes blocked producers.
+        LOG.warning("Closing SSH tunnel: control queue full")
+        await self.close()
 
     def track(self, coro) -> asyncio.Task:
         task = asyncio.create_task(coro)
@@ -92,7 +94,7 @@ class Tunnel:
             task.result()  # Unexpected failures remain visible to the event loop.
 
     async def accept(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        if self.closed or len(self.streams) >= CHANNELS:
+        if self.closed or len(self.streams) >= CHANNELS or len(self.pending) >= WINDOW:
             writer.close()
             await writer.wait_closed()
             return
@@ -153,7 +155,7 @@ class Tunnel:
             raise ProtocolError("Stream sequence gap")
         try:
             data = base64.b64decode(packet.data, validate=True)
-        except binascii.Error as exc:
+        except ValueError as exc:
             raise ProtocolError("Invalid payload") from exc
         if len(data) > CHUNK or (packet.op != "data" and data):
             raise ProtocolError("Invalid payload size")
@@ -278,7 +280,7 @@ class Tunnel:
             self.space.notify_all()
         for channel in list(self.streams):
             self.drop(channel, True)
-        tasks = list(self.tasks)
+        tasks = [task for task in self.tasks if task is not asyncio.current_task()]
         for task in tasks:
             task.cancel()
         for task in tasks:
