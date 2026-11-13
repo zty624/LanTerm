@@ -21,7 +21,7 @@ uv sync --frozen --no-dev
 ./launch.sh --shell bash --cwd /path/to/workspace
 ```
 
-容器无需 Node.js 或 systemd。平台需转发 HTTP 和同端口的 WebSocket。容器内的 Codex、Shell 配置和登录状态需自行准备。参数与密码配置见 [使用说明](usage.md)。
+容器无需 Node.js 或 systemd；安装 git 后可使用「变更」面板。平台需转发 HTTP 和同端口的 WebSocket。容器内的 Codex、Shell 配置和登录状态需自行准备。参数与密码配置见 [使用说明](usage.md)。
 
 SII 内部 Python 源可使用包内导出的固定版本依赖：
 

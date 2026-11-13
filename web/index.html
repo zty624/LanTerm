@@ -242,6 +242,10 @@
               <span data-icon="keyboard"></span>
               <span class="tool-label">按键</span>
             </button>
+            <button id="show-changes" class="tool-button" title="查看分屏当前 Git 仓库的未提交变更">
+              <span data-icon="branch"></span>
+              <span class="tool-label">变更</span>
+            </button>
             <button id="restart-session" hidden>
               <span data-icon="restart"></span>
               <span class="label">重新启动</span>
@@ -501,6 +505,44 @@
           关闭
         </span>
       </div>
+    </dialog>
+
+    <dialog id="changes-dialog" class="changes-dialog" aria-labelledby="changes-title">
+      <div class="dialog-heading">
+        <div class="changes-title-group">
+          <h2 id="changes-title">代码变更</h2>
+          <span id="changes-branch" class="changes-branch" hidden></span>
+        </div>
+        <div>
+          <select
+            id="changes-pane"
+            aria-label="变更所在分屏"
+            title="按分屏当前目录查找仓库"
+          ></select>
+          <button id="changes-refresh" class="icon-button" aria-label="刷新变更" title="刷新">
+            <span data-icon="refresh"></span>
+          </button>
+          <button data-dismiss class="icon-button" aria-label="关闭代码变更">
+            <span data-icon="x"></span>
+          </button>
+        </div>
+      </div>
+      <p id="changes-summary" class="changes-summary"></p>
+      <p id="changes-error" class="form-error" role="alert"></p>
+      <div class="changes-body">
+        <div id="changes-list" class="changes-list" role="list" aria-label="变更文件"></div>
+        <div class="changes-diff">
+          <div class="changes-diff-heading">
+            <strong id="changes-file"></strong>
+            <button id="changes-open" hidden>
+              <span data-icon="eye"></span>
+              预览文件
+            </button>
+          </div>
+          <div id="changes-content" class="diff-view" tabindex="0" aria-label="差异内容"></div>
+        </div>
+      </div>
+      <p class="changes-note">只读：不暂存、不提交，也不修改工作区。</p>
     </dialog>
 
     <dialog id="preview-dialog" class="preview-dialog" aria-labelledby="preview-title">

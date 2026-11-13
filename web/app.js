@@ -8,6 +8,7 @@ import { SessionStatus } from './plugins.js';
 import { PaneControls } from './panes.js';
 import { FilePreview } from './files.js';
 import { Palette } from './palette.js';
+import { Changes } from './changes.js';
 import { Attention } from './attention.js';
 import { hydrateIcons, icon } from './icons.js';
 import { theme } from './theme.js';
@@ -55,6 +56,7 @@ const plugins = new SessionStatus(
   (data) => attention.update(data),
 );
 const preview = new FilePreview(api, active, report);
+const changes = new Changes(api, active, (path) => preview.open(path, null, null), report);
 const panes = new PaneControls(
   api,
   async (sid) => {
@@ -975,6 +977,12 @@ function paletteItems() {
       run: () => $('show-files').click(),
     });
     current({
+      icon: 'branch',
+      title: '代码变更（Git）',
+      keywords: 'git diff status changes review',
+      run: () => changes.open(),
+    });
+    current({
       icon: 'history',
       title: '终端历史',
       keywords: 'history scrollback',
@@ -1055,6 +1063,7 @@ bind('duplicate-session', async () => {
 });
 bind('session-details', () => resources.showSession(state.active));
 bind('show-files', () => preview.open('', state.term, null));
+bind('show-changes', () => changes.open());
 bind('show-panes', () => panes.open(state.active, null));
 bind('batch-mode', () => {
   state.batch = !state.batch;

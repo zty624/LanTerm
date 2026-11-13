@@ -1394,3 +1394,58 @@ test('command palette, themes, agent launch presets and attention alerts', async
   await page.keyboard.press('Escape');
   expect(errors).toEqual([]);
 });
+
+test('git changes panel lists work tree changes and opens their diffs read-only', async ({
+  page,
+  service,
+}) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const repo = join(service.folder, 'project');
+  await mkdir(repo);
+  const git = (...args) =>
+    exec('git', ['-c', 'user.name=LanTerm', '-c', 'user.email=lt@example.invalid', ...args], {
+      cwd: repo,
+    });
+  await git('init', '-q', '-b', 'main');
+  await writeFile(join(repo, 'agent.py'), 'def run():\n    return 1\n');
+  await git('add', '.');
+  await git('commit', '-q', '-m', 'init');
+  await writeFile(join(repo, 'agent.py'), 'def run():\n    return 2\n');
+  await writeFile(join(repo, 'notes.md'), '# Agent notes\n');
+  await login(page, service);
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Review');
+  await page.getByLabel('初始目录', { exact: true }).fill(repo);
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await page.locator('#show-changes').click();
+  const dialog = page.locator('#changes-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#changes-branch')).toContainText('main');
+  await expect(page.locator('.change-item')).toHaveCount(2);
+  await expect(page.locator('.change-item').first()).toContainText('agent.py');
+  await expect(page.locator('.diff-line[data-kind="del"]')).toContainText('return 1');
+  await expect(page.locator('.diff-line[data-kind="add"]')).toContainText('return 2');
+  await page.locator('.change-item', { hasText: 'notes.md' }).click();
+  await expect(page.locator('#changes-file')).toHaveText('notes.md');
+  await expect(page.locator('.diff-line[data-kind="add"]')).toContainText('# Agent notes');
+  await page.getByRole('button', { name: '预览文件' }).click();
+  await expect(page.locator('#preview-dialog')).toBeVisible();
+  await expect(page.locator('#preview-title')).toHaveText('notes.md');
+  await page.getByRole('button', { name: '关闭文件预览', exact: true }).click();
+  await mkdir('.runtime', { recursive: true });
+  await page.screenshot({ path: '.runtime/git-changes-desktop.png' });
+  await page.getByRole('button', { name: '关闭代码变更', exact: true }).click();
+  // The panel never touches the index or the work tree.
+  const { stdout } = await git('status', '--porcelain');
+  expect(stdout).toBe(' M agent.py\n?? notes.md\n');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#show-changes').click();
+  await expect(page.locator('.change-item')).toHaveCount(2);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: '.runtime/git-changes-mobile.png' });
+  expect(errors).toEqual([]);
+});

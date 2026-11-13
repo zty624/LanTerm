@@ -16,6 +16,7 @@ from pydantic import Field
 from starlette.requests import HTTPConnection
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
+from terminal import git
 from terminal.config import ASSETS, Config, agents, available_shells
 from terminal.files import media, preview
 from terminal.inputs import Batch, Create, Login, Metadata, PaneAction, Split
@@ -274,6 +275,25 @@ def create_app(
         return FileResponse(
             file, media_type=mime, filename=file.name, content_disposition_type="inline"
         )
+
+    @api.get("/sessions/{sid}/git")
+    async def git_status(sid: str, pane: Annotated[str, Field(pattern=r"^%\d+$", max_length=24)]):
+        await panes.target(sid, pane)
+        cwd = await sessions.run(["display-message", "-p", "-t", pane, "#{pane_current_path}"])
+        return await asyncio.to_thread(git.status, cwd)
+
+    @api.get("/sessions/{sid}/git/diff")
+    async def git_diff(
+        sid: str,
+        path: Annotated[str, Field(min_length=1, max_length=4096)],
+        pane: Annotated[str, Field(pattern=r"^%\d+$", max_length=24)],
+        orig: Annotated[str, Field(max_length=4096)] = "",
+    ):
+        if any(ord(char) < 32 for char in path + orig):
+            raise HTTPException(422, "路径不能包含控制字符")
+        await panes.target(sid, pane)
+        cwd = await sessions.run(["display-message", "-p", "-t", pane, "#{pane_current_path}"])
+        return await asyncio.to_thread(git.diff, cwd, path, orig)
 
     @api.post("/sessions/{sid}/panes", status_code=201)
     async def split_pane(sid: str, body: Split):

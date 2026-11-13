@@ -29,6 +29,12 @@ def child_env() -> dict[str, str]:
     return env
 
 
+def literal(text: str) -> str:
+    # tmux treats a trailing ";" in an argument as a command separator and turns a
+    # trailing backslash-semicolon into ";". Escaping the last ";" keeps text unchanged.
+    return text[:-1] + "\\;" if text.endswith(";") else text
+
+
 def directory(cwd: str) -> Path:
     path = Path(cwd).expanduser().resolve()
     if not path.is_dir() or not os.access(path, os.R_OK | os.X_OK):
@@ -204,7 +210,7 @@ class Sessions:
             if command:
                 # Typed ahead into the PTY: the shell reads it once started, records it in
                 # history, and remains when the program exits.
-                await self.run(["send-keys", "-t", f"lt-{sid}", "-l", command])
+                await self.run(["send-keys", "-t", f"lt-{sid}", "-l", "--", literal(command)])
                 await self.run(["send-keys", "-t", f"lt-{sid}", "Enter"])
             return await self.get(sid)
 

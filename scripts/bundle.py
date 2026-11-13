@@ -73,21 +73,14 @@ def main() -> None:
                 filter=normalize,
                 recursive=False,
             )
-        for name in (
-            "index.html",
-            "app.js",
-            "app.css",
-            "lantern.svg",
-            "ticker.js",
-            "ssh.html",
-            "ssh.js",
-            "ssh.css",
-            "app.js.LEGAL.txt",
-            "app.css.LEGAL.txt",
-        ):
-            path = assets / name
+        # Lazy previews load code-split chunks and fonts from subfolders: ship the whole build.
+        for path in sorted(assets.rglob("*")):
             if path.is_file():
-                archive.add(path, arcname=f"LanTerm/static/{name}", filter=normalize)
+                archive.add(
+                    path,
+                    arcname=str(Path("LanTerm/static") / path.relative_to(assets)),
+                    filter=normalize,
+                )
     logging.info("运行包已生成: %s (%.1f KiB)", args.output, args.output.stat().st_size / 1024)
 
 

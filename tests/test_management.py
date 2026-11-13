@@ -128,3 +128,15 @@ async def test_launch_command_runs_in_the_new_shell_and_returns_to_it(server):
         # The program ended; its login shell is still interactive.
         await command(ws, "printf 'after:%s\\n' \"$?\"", b"after:3")
     assert (await Sessions(server.config).get(item["id"]))["status"] == "running"
+    # tmux treats a trailing semicolon as a separator; find -exec needs it intact.
+    response = await server.client.post(
+        "/api/sessions",
+        json={
+            **multi,
+            "name": "find",
+            "command": r"find . -maxdepth 0 -exec printf 'found:%s\n' {} \;",
+        },
+    )
+    response.raise_for_status()
+    async with server.websocket(response.json()["id"]) as ws:
+        await until(ws, b"found:.")
