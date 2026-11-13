@@ -1289,3 +1289,108 @@ test.describe('developer file previews', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test('command palette, themes, agent launch presets and attention alerts', async ({
+  page,
+  service,
+}) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await login(page, service);
+  // Launch presets fill the dialog; a custom command runs inside the new login shell.
+  await page.locator('[data-launch="claude"]').click();
+  await expect(page.getByRole('radio', { name: 'Claude Code' })).toBeChecked();
+  await expect(page.getByLabel('会话名称', { exact: true })).toHaveValue(/^Claude · /);
+  await page.getByRole('radio', { name: '自定义' }).check();
+  const quote = (text) => "'" + text.replaceAll("'", "'\\''") + "'";
+  const agent = [
+    'env',
+    `CLAUDE_CONFIG_DIR=${join(service.folder, 'claude')}`,
+    resolve('.venv/bin/python'),
+    resolve('tests/fixtures/claude_process.py'),
+  ]
+    .map(quote)
+    .join(' ');
+  await page.getByLabel('自定义启动命令').fill(agent);
+  await page.getByLabel('会话名称', { exact: true }).fill('Agent run');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  const [session] = await (await page.request.get(service.url + '/api/sessions')).json();
+  const badge = page.locator(`#session-list [data-plugin-session="${session.id}"] .plugin-badge`);
+  await expect(badge).toHaveText('Claude · 等待输入');
+  // With another session in front, agent transitions raise alerts.
+  await page.locator('#new-session').click();
+  await page.getByLabel('会话名称', { exact: true }).fill('Foreground');
+  await page.getByRole('button', { name: '创建会话', exact: true }).click();
+  await expect(page.locator('#active-name')).toHaveText('Foreground');
+  const send = (key) =>
+    exec('tmux', [
+      '-S',
+      join(service.folder, 'tmux.sock'),
+      'send-keys',
+      '-t',
+      `lt-${session.id}`,
+      key,
+    ]);
+  await send('w');
+  await expect(badge).toHaveText('Claude · Working · 工作中');
+  await send('p');
+  const notice = page.locator(`.notice[data-sid="${session.id}"]`);
+  const row = page.locator(`.session-item[data-session-id="${session.id}"]`);
+  await expect(notice).toContainText('Agent run');
+  await expect(notice).toContainText('Claude · 等待授权');
+  await expect(row).toHaveAttribute('data-attention', 'needs');
+  await expect(page).toHaveTitle(/^\(1\) /);
+  await notice.getByRole('button', { name: '查看会话' }).click();
+  await expect(page.locator('#active-name')).toHaveText('Agent run');
+  await expect(notice).toHaveCount(0);
+  await expect(row).not.toHaveAttribute('data-attention');
+  await expect(page).toHaveTitle('Agent run — LanTerm');
+  // The palette switches sessions by fuzzy name.
+  await page.keyboard.press('Control+Shift+P');
+  await expect(page.locator('#palette')).toBeVisible();
+  await page.getByLabel('在命令面板中查找').fill('foregrnd');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#palette')).toBeHidden();
+  await expect(page.locator('#active-name')).toHaveText('Foreground');
+  await send('w');
+  await expect(badge).toHaveText('Claude · Working · 工作中');
+  await send('i');
+  await expect(notice).toHaveAttribute('data-kind', 'done');
+  await expect(row).toHaveAttribute('data-attention', 'done');
+  // Themes switch from the palette; the terminal palette follows unless pinned dark.
+  const foreground = () =>
+    page.evaluate(() => getComputedStyle(document.querySelector('.xterm-rows')).color);
+  await page.keyboard.press('Control+Shift+P');
+  await page.getByLabel('在命令面板中查找').fill('深色主题');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect.poll(foreground).toBe('rgb(230, 225, 215)');
+  const darkBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  await page.keyboard.press('Control+Shift+P');
+  await page.getByLabel('在命令面板中查找').fill('浅色主题');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect.poll(foreground).toBe('rgb(43, 40, 36)');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).not.toBe(
+    darkBackground,
+  );
+  await page.locator('#settings-menu summary').click();
+  await page.getByLabel('浅色主题下终端保持深色').check();
+  await expect(page.locator('html')).toHaveAttribute('data-terminal-theme', 'dark');
+  await expect.poll(foreground).toBe('rgb(230, 225, 215)');
+  await page.reload();
+  await expect(page.locator('#connection-status')).toHaveText('已连接');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect.poll(foreground).toBe('rgb(230, 225, 215)');
+  await mkdir('.runtime', { recursive: true });
+  await page.screenshot({ path: '.runtime/palette-alerts-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.keyboard.press('Control+Shift+P');
+  const box = await page.locator('#palette').boundingBox();
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: '.runtime/palette-mobile.png' });
+  await page.keyboard.press('Escape');
+  expect(errors).toEqual([]);
+});

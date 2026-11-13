@@ -2,9 +2,8 @@ import mermaid from 'mermaid';
 import DOMPurify from 'dompurify';
 import { el } from './dom.js';
 
-mermaid.initialize({
+const settings = {
   startOnLoad: false,
-  theme: 'dark',
   securityLevel: 'strict',
   suppressErrorRendering: true,
   htmlLabels: false,
@@ -20,10 +19,20 @@ mermaid.initialize({
     'htmlLabels',
     'themeCSS',
   ],
-});
+};
+let applied = null;
 let sequence = 0;
 
+// Follow the page theme at render time; diagrams are re-rendered per preview.
+function configure() {
+  const theme = document.documentElement.dataset.resolvedTheme === 'dark' ? 'dark' : 'neutral';
+  if (applied === theme) return;
+  mermaid.initialize({ ...settings, theme });
+  applied = theme;
+}
+
 export async function renderDiagrams(article, alive) {
+  configure();
   const blocks = [...article.querySelectorAll('code.language-mermaid')];
   if (blocks.length > 12)
     article.append(el('p', 'render-note', '仅渲染前 12 张图表，其余保留源码。'));

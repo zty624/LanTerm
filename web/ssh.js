@@ -1,3 +1,4 @@
+import './theme.js';
 const $ = (id) => document.getElementById(id);
 let relay = null;
 let timer = null;

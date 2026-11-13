@@ -4,6 +4,8 @@
 
 基于 tmux 的内网 Web 终端，支持 Bash / Zsh、Vim、Codex 与 Claude Code。浏览器断开后，会话继续运行。
 
+- 浅色 / 深色主题，命令面板（`Ctrl+Shift+P`）快速切换会话和执行操作。
+- 一键新建 Claude Code / Codex 会话；Agent 完成任务或请求授权时页面内提醒，可开启桌面通知与提示音。
 - tmux 分屏；会话重命名、分组、标签、置顶、复制和批量管理。
 - CPU、内存、GPU 与会话进程监控。
 - Codex / Claude Code 状态插件：工作中、等待输入、等待授权、暂停等。

@@ -24,8 +24,19 @@ class Config:
         return self.state / "tmux.sock"
 
 
+AGENTS = (("claude", "Claude Code", "claude"), ("codex", "Codex", "codex"))
+
+
 def available_shells() -> dict[str, str]:
     return {name: path for name in ("bash", "zsh") if (path := shutil.which(name))}
+
+
+def agents() -> list[dict]:
+    # The login shell may extend PATH, so a missing binary here is only a hint.
+    return [
+        {"id": key, "name": name, "command": command, "installed": bool(shutil.which(command))}
+        for key, name, command in AGENTS
+    ]
 
 
 def prepare(

@@ -1,0 +1,160 @@
+/* ── Design tokens ─────────────────────────────────────────────────────────
+   Light is the default; dark applies by system preference unless the page
+   pins a theme with <html data-theme>. Components use only these tokens. */
+:root {
+  color-scheme: light;
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Noto Sans CJK SC',
+    'Microsoft YaHei', sans-serif;
+  --font-serif:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Noto Serif CJK SC',
+    'Source Han Serif SC', 'Songti SC', serif;
+  --font-mono:
+    'JetBrains Mono', 'Cascadia Code', 'Fira Code', ui-monospace, SFMono-Regular, Menlo,
+    'Noto Sans Mono CJK SC', monospace;
+  --radius-sm: 6px;
+  --radius: 9px;
+  --radius-lg: 14px;
+
+  --bg: #f7f5f0;
+  --bg-sidebar: #f0ede5;
+  --surface: #ffffff;
+  --surface-2: #f4f1ea;
+  --surface-3: #ebe7dd;
+  --field: #ffffff;
+  --border: #e4dfd4;
+  --border-strong: #d3cdbf;
+  --text: #23211d;
+  --text-2: #5a554c;
+  --text-3: #8b857a;
+  --accent: #c4552d;
+  --accent-hover: #ad4826;
+  --accent-soft: #f7e6dc;
+  --accent-line: #e9c3b0;
+  --accent-text: #a3431f;
+  --on-accent: #ffffff;
+  --ok: #3d7c4c;
+  --ok-soft: #e2efe3;
+  --warn: #9b6510;
+  --warn-soft: #f6ead0;
+  --bad: #b5382e;
+  --bad-soft: #f8e2de;
+  --bad-line: #e9b9b2;
+  --info: #2d68ab;
+  --info-soft: #e1eaf6;
+  --violet: #7a55b0;
+  --violet-soft: #ece4f6;
+  --term-bg: #fbfaf6;
+  --overlay: rgb(35 30 22 / 0.32);
+  --shadow-sm: 0 1px 2px rgb(40 32 20 / 0.06);
+  --shadow-md: 0 8px 24px rgb(40 32 20 / 0.1), 0 1px 3px rgb(40 32 20 / 0.06);
+  --shadow-lg: 0 24px 64px rgb(40 32 20 / 0.18), 0 2px 8px rgb(40 32 20 / 0.08);
+  --syn-comment: #8b857a;
+  --syn-keyword: #a3431f;
+  --syn-string: #3f7a3a;
+  --syn-number: #9a6a00;
+  --syn-title: #2d68ab;
+  --syn-type: #7a55b0;
+  --syn-attr: #1f7a78;
+  --syn-meta: #77716a;
+  --syn-add: #e3f0df;
+  --syn-del: #f8e3df;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #1f1e1b;
+    --bg-sidebar: #191816;
+    --surface: #282622;
+    --surface-2: #2f2d29;
+    --surface-3: #3a3732;
+    --field: #1c1b19;
+    --border: #36332e;
+    --border-strong: #48443d;
+    --text: #ede9e0;
+    --text-2: #bab4a8;
+    --text-3: #8a8478;
+    --accent: #e3825a;
+    --accent-hover: #ec9772;
+    --accent-soft: #3b2a21;
+    --accent-line: #6a4532;
+    --accent-text: #f0a888;
+    --on-accent: #20140e;
+    --ok: #8cc79a;
+    --ok-soft: #233529;
+    --warn: #e3b562;
+    --warn-soft: #3a3020;
+    --bad: #ee8b80;
+    --bad-soft: #3e2623;
+    --bad-line: #6e3d37;
+    --info: #8db4e8;
+    --info-soft: #1f2d3f;
+    --violet: #bfa2e6;
+    --violet-soft: #2d2540;
+    --term-bg: #1b1a18;
+    --overlay: rgb(8 7 6 / 0.62);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 8px 24px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
+    --syn-comment: #857f73;
+    --syn-keyword: #f0a888;
+    --syn-string: #a8cf96;
+    --syn-number: #e5bf78;
+    --syn-title: #94bbec;
+    --syn-type: #c9aee9;
+    --syn-attr: #86cbc6;
+    --syn-meta: #9c968a;
+    --syn-add: #233529;
+    --syn-del: #3e2623;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #1f1e1b;
+  --bg-sidebar: #191816;
+  --surface: #282622;
+  --surface-2: #2f2d29;
+  --surface-3: #3a3732;
+  --field: #1c1b19;
+  --border: #36332e;
+  --border-strong: #48443d;
+  --text: #ede9e0;
+  --text-2: #bab4a8;
+  --text-3: #8a8478;
+  --accent: #e3825a;
+  --accent-hover: #ec9772;
+  --accent-soft: #3b2a21;
+  --accent-line: #6a4532;
+  --accent-text: #f0a888;
+  --on-accent: #20140e;
+  --ok: #8cc79a;
+  --ok-soft: #233529;
+  --warn: #e3b562;
+  --warn-soft: #3a3020;
+  --bad: #ee8b80;
+  --bad-soft: #3e2623;
+  --bad-line: #6e3d37;
+  --info: #8db4e8;
+  --info-soft: #1f2d3f;
+  --violet: #bfa2e6;
+  --violet-soft: #2d2540;
+  --term-bg: #1b1a18;
+  --overlay: rgb(8 7 6 / 0.62);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
+  --syn-comment: #857f73;
+  --syn-keyword: #f0a888;
+  --syn-string: #a8cf96;
+  --syn-number: #e5bf78;
+  --syn-title: #94bbec;
+  --syn-type: #c9aee9;
+  --syn-attr: #86cbc6;
+  --syn-meta: #9c968a;
+  --syn-add: #233529;
+  --syn-del: #3e2623;
+}
+/* The terminal can stay dark inside the light theme. */
+:root[data-terminal-theme='dark'] {
+  --term-bg: #1b1a18;
+}

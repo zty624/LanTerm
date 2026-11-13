@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#111318" />
+    <meta name="theme-color" content="#f7f5f0" />
+    <meta name="color-scheme" content="light dark" />
     <title>LanTerm</title>
     <link rel="icon" type="image/svg+xml" href="static/lantern.svg" />
     <link rel="stylesheet" href="static/app.css" />
@@ -16,10 +17,10 @@
           class="brand-icon"
           src="static/lantern.svg"
           alt="LanTerm 灯笼 Logo"
-          width="64"
-          height="64"
+          width="56"
+          height="56"
         />
-        <span class="eyebrow">YOUR SHELL, IN YOUR BROWSER</span>
+        <span class="eyebrow">Your shell, in your browser</span>
         <h1>LanTerm</h1>
         <p>连接你的工作环境，接着上次的地方继续。</p>
         <label for="password">访问密码</label>
@@ -34,7 +35,7 @@
         <p id="login-error" class="form-error" role="alert"></p>
         <button type="submit" class="primary">
           连接终端
-          <span>↗</span>
+          <span data-icon="arrow-right"></span>
         </button>
         <small>真实 Shell · 独立会话 · 断线保留</small>
       </form>
@@ -47,26 +48,42 @@
             class="brand-icon small"
             src="static/lantern.svg"
             alt="灯笼"
-            width="32"
-            height="32"
+            width="26"
+            height="26"
           />
           <strong>LanTerm</strong>
-          <a id="ssh-link" href="ssh" target="_blank" rel="noopener" hidden>SSH 连接</a>
+          <div class="brand-actions">
+            <a
+              id="ssh-link"
+              href="ssh"
+              target="_blank"
+              rel="noopener"
+              title="浏览器 SSH 连接"
+              hidden
+            >
+              <span data-icon="link"></span>
+              SSH 连接
+            </a>
+          </div>
         </div>
         <button id="new-session" class="new-session">
-          <span>＋</span>
+          <span data-icon="plus"></span>
           新建会话
-          <kbd>⌃ ⇧ K</kbd>
+          <kbd>Ctrl ⇧ K</kbd>
         </button>
         <div class="session-filters">
-          <input
-            id="filter-query"
-            type="search"
-            aria-label="搜索会话"
-            placeholder="搜索名称、标签、目录…"
-          />
+          <div class="search-field">
+            <span data-icon="search"></span>
+            <input
+              id="filter-query"
+              type="search"
+              aria-label="搜索会话"
+              placeholder="搜索名称、标签、目录…"
+            />
+          </div>
           <details id="filter-options" class="filter-options">
             <summary>
+              <span data-icon="chevron-right"></span>
               筛选与排序
               <span id="filter-summary"></span>
             </summary>
@@ -134,13 +151,60 @@
         <div class="sidebar-footer">
           <span class="dot"></span>
           <span id="host-label"></span>
+          <details id="settings-menu" class="popover settings-menu">
+            <summary aria-label="外观与通知设置" title="外观与通知">
+              <span data-icon="sliders"></span>
+            </summary>
+            <div class="popover-panel">
+              <div class="settings-title">外观</div>
+              <div class="segmented" role="radiogroup" aria-label="主题">
+                <label>
+                  <input type="radio" name="theme" value="system" />
+                  <span>
+                    <span data-icon="display"></span>
+                    系统
+                  </span>
+                </label>
+                <label>
+                  <input type="radio" name="theme" value="light" />
+                  <span>
+                    <span data-icon="sun"></span>
+                    浅色
+                  </span>
+                </label>
+                <label>
+                  <input type="radio" name="theme" value="dark" />
+                  <span>
+                    <span data-icon="moon"></span>
+                    深色
+                  </span>
+                </label>
+              </div>
+              <label class="toggle-row">
+                <input id="terminal-dark" type="checkbox" />
+                浅色主题下终端保持深色
+              </label>
+              <div class="settings-title">Agent 提醒</div>
+              <label class="toggle-row">
+                <input id="notify-desktop" type="checkbox" />
+                桌面通知
+              </label>
+              <label class="toggle-row">
+                <input id="notify-sound" type="checkbox" />
+                提示音
+              </label>
+              <p id="notify-note" class="settings-note">
+                Claude Code、Codex 完成任务或请求授权时提醒，页面在后台也会检查。
+              </p>
+            </div>
+          </details>
           <button
             id="logout"
             class="icon-button"
             title="退出登录，保留终端进程"
             aria-label="退出登录"
           >
-            ↪
+            <span data-icon="logout"></span>
           </button>
         </div>
       </aside>
@@ -155,153 +219,238 @@
             aria-controls="sidebar"
             aria-expanded="true"
           >
-            ☰
+            <span data-icon="panel-left"></span>
           </button>
           <div class="session-heading">
             <strong id="active-name">工作空间</strong>
             <span id="active-detail">选择或新建一个终端</span>
           </div>
           <div class="toolbar-actions" id="session-actions" hidden>
-            <button id="show-panes" title="左右 / 上下分屏，管理当前窗口">分屏</button>
-            <button id="show-search" title="搜索当前终端缓冲区 · Ctrl+Shift+F">搜索</button>
-            <button id="show-paste" title="粘贴文本；也可直接使用 Ctrl+Shift+V">粘贴</button>
-            <button id="show-keys" title="发送被浏览器占用的控制键">按键</button>
-            <button id="restart-session" hidden>重新启动</button>
+            <button id="show-panes" class="tool-button" title="左右 / 上下分屏，管理当前窗口">
+              <span data-icon="columns"></span>
+              <span class="tool-label">分屏</span>
+            </button>
+            <button id="show-search" class="tool-button" title="搜索当前终端缓冲区 · Ctrl+Shift+F">
+              <span data-icon="search"></span>
+              <span class="tool-label">搜索</span>
+            </button>
+            <button id="show-paste" class="tool-button" title="粘贴文本；也可直接使用 Ctrl+Shift+V">
+              <span data-icon="clipboard"></span>
+              <span class="tool-label">粘贴</span>
+            </button>
+            <button id="show-keys" class="tool-button" title="发送被浏览器占用的控制键">
+              <span data-icon="keyboard"></span>
+              <span class="tool-label">按键</span>
+            </button>
+            <button id="restart-session" hidden>
+              <span data-icon="restart"></span>
+              <span class="label">重新启动</span>
+            </button>
             <details id="session-menu" class="session-menu">
-              <summary aria-label="更多会话操作">
-                更多
-                <span aria-hidden="true">⌄</span>
+              <summary aria-label="更多会话操作" title="更多会话操作">
+                <span data-icon="more"></span>
+                <span class="tool-label" aria-hidden="true">更多</span>
               </summary>
               <div class="session-menu-items">
                 <span class="menu-label">当前会话</span>
-                <button id="rename-session" title="重命名会话">重命名</button>
-                <button id="pin-session">置顶</button>
+                <button id="rename-session" title="重命名会话">
+                  <span data-icon="pencil"></span>
+                  重命名
+                </button>
+                <button id="pin-session">
+                  <span data-icon="pin"></span>
+                  <span class="label">置顶</span>
+                </button>
                 <button id="duplicate-session" title="使用相同 Shell、当前目录和分组创建新会话">
+                  <span data-icon="copy"></span>
                   复制会话
                 </button>
-                <button id="session-details">会话详情</button>
-                <button id="show-files">预览文件</button>
-                <button id="show-history" title="查看 tmux 保留的完整历史">终端历史</button>
+                <button id="session-details">
+                  <span data-icon="info"></span>
+                  会话详情
+                </button>
+                <button id="show-files">
+                  <span data-icon="file"></span>
+                  预览文件
+                </button>
+                <button id="show-history" title="查看 tmux 保留的完整历史">
+                  <span data-icon="history"></span>
+                  终端历史
+                </button>
+                <div class="menu-separator"></div>
                 <button id="close-session" class="danger-subtle" title="结束此会话及其中的进程">
+                  <span data-icon="trash"></span>
                   关闭会话…
                 </button>
               </div>
             </details>
           </div>
-          <button id="show-monitor" class="monitor-toggle">资源监控</button>
-          <button id="fullscreen" class="icon-button" title="全屏" aria-label="全屏">⛶</button>
+          <div class="toolbar-group">
+            <span class="toolbar-divider"></span>
+            <button
+              id="show-palette"
+              class="tool-button palette-button"
+              title="命令面板 · Ctrl+Shift+P"
+            >
+              <span data-icon="command"></span>
+              <span class="tool-label">命令</span>
+              <kbd>Ctrl ⇧ P</kbd>
+            </button>
+            <button id="show-monitor" class="tool-button monitor-toggle" aria-pressed="false">
+              <span data-icon="activity"></span>
+              <span class="tool-label" id="monitor-label">资源监控</span>
+            </button>
+            <button id="fullscreen" class="icon-button" title="全屏" aria-label="全屏">
+              <span data-icon="maximize"></span>
+            </button>
+          </div>
         </header>
-        <div id="search-bar" class="search-bar" hidden>
-          <input id="search-input" aria-label="搜索终端" placeholder="搜索当前缓冲区…" />
-          <button id="search-prev" aria-label="上一个结果">↑</button>
-          <button id="search-next" aria-label="下一个结果">↓</button>
-          <button id="search-close" aria-label="关闭搜索">×</button>
-        </div>
-        <div id="empty-state" class="empty-state">
-          <div class="terminal-art" aria-hidden="true">
-            <span>~/workspace</span>
+        <div class="stage">
+          <div id="search-bar" class="search-bar" hidden>
+            <input id="search-input" aria-label="搜索终端" placeholder="搜索当前缓冲区…" />
+            <button id="search-prev" aria-label="上一个结果">
+              <span data-icon="arrow-up"></span>
+            </button>
+            <button id="search-next" aria-label="下一个结果">
+              <span data-icon="arrow-down"></span>
+            </button>
+            <button id="search-close" aria-label="关闭搜索">
+              <span data-icon="x"></span>
+            </button>
+          </div>
+          <div id="empty-state" class="empty-state">
+            <img
+              class="brand-icon"
+              src="static/lantern.svg"
+              alt=""
+              width="52"
+              height="52"
+              aria-hidden="true"
+            />
+            <h2 class="display">今天从哪里开始？</h2>
             <p>
-              <b>❯</b>
-              <i></i>
+              启动 Shell、Claude Code 或 Codex。会话由 tmux 持有，关闭页面后依然运行，回来接着用。
             </p>
+            <div class="launch-grid">
+              <button id="first-session" class="launch-card">
+                <span data-icon="terminal"></span>
+                <strong>创建第一个会话</strong>
+                <small>Bash / Zsh 终端</small>
+              </button>
+              <button class="launch-card" data-launch="claude">
+                <span data-icon="sparkle"></span>
+                <strong>启动 Claude Code</strong>
+                <small>新会话中运行 claude</small>
+              </button>
+              <button class="launch-card" data-launch="codex">
+                <span data-icon="hexagon"></span>
+                <strong>启动 Codex</strong>
+                <small>新会话中运行 codex</small>
+              </button>
+            </div>
+            <div class="empty-hint">
+              <span>
+                <kbd>Ctrl ⇧ K</kbd>
+                新建会话
+              </span>
+              <span>
+                <kbd>Ctrl ⇧ P</kbd>
+                命令面板
+              </span>
+              <span>
+                <kbd>Shift</kbd>
+                拖选复制
+              </span>
+            </div>
           </div>
-          <h2>一个终端，无限可能。</h2>
-          <p>
-            启动 Bash 或 Zsh，运行你熟悉的命令和工具。
-            <br />
-            每个会话独立运行，离开页面也会继续。
-          </p>
-          <button id="first-session" class="primary">＋ 创建第一个会话</button>
-          <div class="tool-chips">
-            <span>bash</span>
-            <span>zsh</span>
-            <span>vim</span>
-            <span>codex</span>
-            <span>htop</span>
-          </div>
-        </div>
-        <div id="terminal" hidden aria-label="交互终端"></div>
-        <section id="monitor-view" class="monitor-view" hidden aria-label="资源监控面板">
-          <div class="monitor-content">
-            <div class="monitor-heading">
-              <div>
-                <span class="eyebrow">RESOURCE MONITOR</span>
-                <h2>资源总览</h2>
-                <p id="monitor-scope">正在读取运行环境…</p>
+          <div id="terminal" hidden aria-label="交互终端"></div>
+          <section id="monitor-view" class="monitor-view" hidden aria-label="资源监控面板">
+            <div class="monitor-content">
+              <div class="monitor-heading">
+                <div>
+                  <span class="eyebrow">Resource monitor</span>
+                  <h2>资源总览</h2>
+                  <p id="monitor-scope">正在读取运行环境…</p>
+                </div>
+                <div class="monitor-update">
+                  <span id="monitor-updated">正在采样</span>
+                  <button id="monitor-refresh" title="获取最新的资源采样">
+                    <span data-icon="refresh"></span>
+                    刷新
+                  </button>
+                </div>
               </div>
-              <div class="monitor-update">
-                <span id="monitor-updated">正在采样</span>
-                <button id="monitor-refresh" title="获取最新的资源采样">↻ 刷新</button>
+              <p id="monitor-error" class="form-error" role="alert"></p>
+              <p id="monitor-warmup" class="monitor-note" hidden>
+                正在采集速率，下一次采样后自动显示。
+              </p>
+              <div id="metric-cards" class="metric-cards"></div>
+              <div class="monitor-section-heading">
+                <h3>GPU 设备</h3>
+                <span>设备整体用量，可能包含其他进程</span>
               </div>
-            </div>
-            <p id="monitor-error" class="form-error" role="alert"></p>
-            <p id="monitor-warmup" class="monitor-note" hidden>
-              正在采集速率，下一次采样后自动显示。
-            </p>
-            <div id="metric-cards" class="metric-cards"></div>
-            <div class="monitor-section-heading">
-              <h3>GPU 设备</h3>
-              <span>设备整体用量，可能包含其他进程</span>
-            </div>
-            <div id="gpu-cards" class="gpu-cards"></div>
-            <p id="gpu-note" class="monitor-empty" hidden></p>
-            <p id="gpu-scope" class="monitor-note" hidden></p>
-            <div class="monitor-section-heading">
-              <h3>
-                会话资源
-                <span id="resource-session-count" class="count-badge"></span>
-              </h3>
-              <span>CPU 100% = 1 核 · 内存为进程树 RSS 合计</span>
-            </div>
-            <div class="table-scroll">
-              <table class="resource-table">
-                <thead>
-                  <tr>
-                    <th>会话</th>
-                    <th>分组</th>
-                    <th>状态</th>
-                    <th>进程数</th>
-                    <th>CPU</th>
-                    <th>内存 RSS</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="session-resources"></tbody>
-              </table>
-            </div>
-            <p id="session-resources-empty" class="monitor-empty" hidden>
-              暂无会话。新建终端后，这里会显示对应的进程资源。
-            </p>
-            <details class="monitor-help">
-              <summary>统计范围与说明</summary>
-              <p>
-                CPU、内存和进程数优先统计当前
-                cgroup，卡片会注明范围。工作目录存储为所在文件系统的用量，网络统计不含本地回环接口。GPU
-                利用率和显存占用分别显示。
+              <div id="gpu-cards" class="gpu-cards"></div>
+              <p id="gpu-note" class="monitor-empty" hidden></p>
+              <p id="gpu-scope" class="monitor-note" hidden></p>
+              <div class="monitor-section-heading">
+                <h3>
+                  会话资源
+                  <span id="resource-session-count" class="count-badge"></span>
+                </h3>
+                <span>CPU 100% = 1 核 · 内存为进程树 RSS 合计</span>
+              </div>
+              <div class="table-scroll">
+                <table class="resource-table">
+                  <thead>
+                    <tr>
+                      <th>会话</th>
+                      <th>分组</th>
+                      <th>状态</th>
+                      <th>进程数</th>
+                      <th>CPU</th>
+                      <th>内存 RSS</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="session-resources"></tbody>
+                </table>
+              </div>
+              <p id="session-resources-empty" class="monitor-empty" hidden>
+                暂无会话。新建终端后，这里会显示对应的进程资源。
               </p>
-              <p>
-                共享内存页可能在多个进程的 RSS
-                中重复计算；脱离会话进程树的进程不计入该会话。首次采样或页面长时间不可见后，速率需要下一次采样才能显示。不可读取的指标显示为
-                —。
-              </p>
-            </details>
+              <details class="monitor-help">
+                <summary>统计范围与说明</summary>
+                <p>
+                  CPU、内存和进程数优先统计当前
+                  cgroup，卡片会注明范围。工作目录存储为所在文件系统的用量，网络统计不含本地回环接口。GPU
+                  利用率和显存占用分别显示。
+                </p>
+                <p>
+                  共享内存页可能在多个进程的 RSS
+                  中重复计算；脱离会话进程树的进程不计入该会话。首次采样或页面长时间不可见后，速率需要下一次采样才能显示。不可读取的指标显示为
+                  —。
+                </p>
+              </details>
+            </div>
+          </section>
+          <div id="reconnect-banner" class="reconnect-banner" hidden>
+            <span id="reconnect-text">连接已断开，正在重新连接…</span>
+            <button id="reconnect-now">立即重连</button>
           </div>
-        </section>
-        <div id="reconnect-banner" class="reconnect-banner" hidden>
-          <span id="reconnect-text">连接已断开，正在重新连接…</span>
-          <button id="reconnect-now">立即重连</button>
         </div>
         <footer class="statusbar">
-          <span>
+          <span class="status-connection">
             <span id="connection-dot" class="dot muted"></span>
             <span id="connection-status">准备就绪</span>
           </span>
           <span id="terminal-size"></span>
           <span class="keyboard-hint">Shift + 拖选复制 · 滚轮查看历史</span>
-          <div class="zoom" title="终端字号">
-            <button id="zoom-out" aria-label="缩小字体">−</button>
-            <span id="font-size">16px</span>
-            <button id="zoom-in" aria-label="放大字体">＋</button>
+          <div class="status-tools">
+            <div class="zoom" title="终端字号">
+              <button id="zoom-out" aria-label="缩小字体">−</button>
+              <span id="font-size">16px</span>
+              <button id="zoom-in" aria-label="放大字体">＋</button>
+            </div>
           </div>
         </footer>
         <nav class="keybar" aria-label="终端快捷键">
@@ -321,6 +470,39 @@
       </section>
     </main>
 
+    <dialog id="palette" class="palette" aria-label="命令面板">
+      <div class="palette-search">
+        <span data-icon="search"></span>
+        <input
+          id="palette-input"
+          aria-label="在命令面板中查找"
+          placeholder="切换会话、启动 Agent 或执行命令…"
+          autocomplete="off"
+          spellcheck="false"
+          role="combobox"
+          aria-controls="palette-list"
+          aria-expanded="true"
+        />
+        <kbd>Esc</kbd>
+      </div>
+      <div id="palette-list" role="listbox" aria-label="命令面板结果"></div>
+      <div class="palette-footer">
+        <span>
+          <kbd>↑</kbd>
+          <kbd>↓</kbd>
+          选择
+        </span>
+        <span>
+          <kbd>Enter</kbd>
+          执行
+        </span>
+        <span>
+          <kbd>Esc</kbd>
+          关闭
+        </span>
+      </div>
+    </dialog>
+
     <dialog id="preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
       <div class="preview-heading">
         <div class="preview-title-group">
@@ -338,10 +520,12 @@
             aria-label="在新标签页打开"
             hidden
           >
-            ↗
+            <span data-icon="external"></span>
           </a>
           <button id="preview-maximize" aria-pressed="false">最大化</button>
-          <button data-dismiss class="icon-button" aria-label="关闭文件预览">×</button>
+          <button data-dismiss class="icon-button" aria-label="关闭文件预览">
+            <span data-icon="x"></span>
+          </button>
         </div>
       </div>
       <form id="preview-form" class="preview-address">
@@ -352,10 +536,10 @@
           title="返回上一个文件"
           disabled
         >
-          ←
+          <span data-icon="arrow-left"></span>
         </button>
         <button id="preview-parent" type="button" aria-label="上级目录" title="上级目录" disabled>
-          ↑
+          <span data-icon="arrow-up"></span>
         </button>
         <input
           id="preview-path"
@@ -391,8 +575,12 @@
           placeholder="搜索当前视图…"
         />
         <span id="preview-match-count" aria-live="polite"></span>
-        <button id="preview-match-prev" aria-label="上一个文件匹配" disabled>↑</button>
-        <button id="preview-match-next" aria-label="下一个文件匹配" disabled>↓</button>
+        <button id="preview-match-prev" aria-label="上一个文件匹配" disabled>
+          <span data-icon="arrow-up"></span>
+        </button>
+        <button id="preview-match-next" aria-label="下一个文件匹配" disabled>
+          <span data-icon="arrow-down"></span>
+        </button>
         <button id="preview-wrap" aria-pressed="false">自动换行</button>
         <button id="preview-copy">复制源码</button>
       </div>
@@ -405,10 +593,68 @@
       <form id="session-form">
         <div class="dialog-heading">
           <h2 id="dialog-title">新建会话</h2>
-          <button type="button" class="icon-button" data-dismiss aria-label="取消">×</button>
+          <button type="button" class="icon-button" data-dismiss aria-label="取消">
+            <span data-icon="x"></span>
+          </button>
         </div>
         <label for="session-name">会话名称</label>
-        <input id="session-name" maxlength="80" required placeholder="例如：Codex · 项目开发" />
+        <input id="session-name" maxlength="80" required placeholder="例如：Claude · 项目开发" />
+        <div id="create-options">
+          <span class="field-label" id="launch-label">启动程序</span>
+          <div
+            id="launch-options"
+            class="segmented"
+            role="radiogroup"
+            aria-labelledby="launch-label"
+          >
+            <label>
+              <input type="radio" name="launch" value="" checked />
+              <span>
+                <span data-icon="terminal"></span>
+                仅 Shell
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="launch" value="claude" />
+              <span>
+                <span data-icon="sparkle"></span>
+                Claude Code
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="launch" value="codex" />
+              <span>
+                <span data-icon="hexagon"></span>
+                Codex
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="launch" value="custom" />
+              <span>自定义</span>
+            </label>
+          </div>
+          <input
+            id="session-command"
+            aria-label="自定义启动命令"
+            maxlength="2000"
+            placeholder="例如：htop 或 python train.py"
+            spellcheck="false"
+            hidden
+          />
+          <p id="launch-hint" class="launch-hint">
+            Shell 启动后自动输入该命令；程序退出后回到 Shell。
+          </p>
+          <div class="form-columns">
+            <div>
+              <label for="session-shell">Shell</label>
+              <select id="session-shell"></select>
+            </div>
+            <div>
+              <label for="session-cwd">初始目录</label>
+              <input id="session-cwd" required placeholder="/path/to/project" spellcheck="false" />
+            </div>
+          </div>
+        </div>
         <div class="form-columns">
           <div>
             <label for="session-group">分组</label>
@@ -431,12 +677,6 @@
           maxlength="500"
           placeholder="这个会话的用途…"
         ></textarea>
-        <div id="create-options">
-          <label for="session-shell">Shell</label>
-          <select id="session-shell"></select>
-          <label for="session-cwd">初始目录</label>
-          <input id="session-cwd" required placeholder="/path/to/project" />
-        </div>
         <p id="session-error" class="form-error" role="alert"></p>
         <div class="dialog-footer">
           <button type="button" data-dismiss>取消</button>
@@ -450,7 +690,9 @@
       <form id="batch-form">
         <div class="dialog-heading">
           <h2 id="batch-title">批量操作</h2>
-          <button type="button" data-dismiss class="icon-button" aria-label="取消">×</button>
+          <button type="button" data-dismiss class="icon-button" aria-label="取消">
+            <span data-icon="x"></span>
+          </button>
         </div>
         <p id="batch-description"></p>
         <ul id="batch-preview"></ul>
@@ -473,7 +715,9 @@
     <dialog id="details-dialog" class="details-dialog">
       <div class="dialog-heading">
         <h2 id="details-title">会话详情</h2>
-        <button data-dismiss class="icon-button" aria-label="关闭详情">×</button>
+        <button data-dismiss class="icon-button" aria-label="关闭详情">
+          <span data-icon="x"></span>
+        </button>
       </div>
       <div id="details-summary" class="details-summary"></div>
       <p id="details-note"></p>
@@ -502,7 +746,9 @@
     <dialog id="pane-dialog">
       <div class="dialog-heading">
         <h2>终端分屏</h2>
-        <button data-dismiss class="icon-button" aria-label="关闭分屏面板">×</button>
+        <button data-dismiss class="icon-button" aria-label="关闭分屏面板">
+          <span data-icon="x"></span>
+        </button>
       </div>
       <p id="pane-context"></p>
       <label for="pane-target">操作分屏</label>
@@ -552,7 +798,9 @@
       <form id="paste-form">
         <div class="dialog-heading">
           <h2>粘贴到终端</h2>
-          <button type="button" data-dismiss class="icon-button" aria-label="取消">×</button>
+          <button type="button" data-dismiss class="icon-button" aria-label="取消">
+            <span data-icon="x"></span>
+          </button>
         </div>
         <p>在下方粘贴文本，再发送到当前会话。</p>
         <textarea id="paste-text" rows="8" spellcheck="false" aria-label="待粘贴文本"></textarea>
@@ -568,12 +816,15 @@
         <h2>会话历史</h2>
         <div>
           <button id="download-history">下载 .txt</button>
-          <button data-dismiss class="icon-button" aria-label="关闭历史">×</button>
+          <button data-dismiss class="icon-button" aria-label="关闭历史">
+            <span data-icon="x"></span>
+          </button>
         </div>
       </div>
       <p>保留最近 20,000 行。全屏程序的当前画面可在终端中查看。</p>
       <pre id="history-content" tabindex="0"></pre>
     </dialog>
+    <div id="notices" class="notices" aria-live="polite"></div>
     <div id="toast" class="toast" role="status" hidden></div>
   </body>
 </html>

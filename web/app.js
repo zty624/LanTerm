@@ -7,8 +7,14 @@ import { ResourceView } from './monitor.js';
 import { SessionStatus } from './plugins.js';
 import { PaneControls } from './panes.js';
 import { FilePreview } from './files.js';
+import { Palette } from './palette.js';
+import { Attention } from './attention.js';
+import { hydrateIcons, icon } from './icons.js';
+import { theme } from './theme.js';
 import { $, el, reconcile, text } from './dom.js';
 import './style.css';
+
+hydrateIcons(document);
 
 const encoder = new TextEncoder();
 const state = {
@@ -38,7 +44,16 @@ const resources = new ResourceView(
   select,
   () => state.loggedIn,
 );
-const plugins = new SessionStatus(api, () => state.loggedIn);
+const attention = new Attention(
+  () => state.sessions,
+  () => state.active,
+  select,
+);
+const plugins = new SessionStatus(
+  api,
+  () => state.loggedIn,
+  (data) => attention.update(data),
+);
 const preview = new FilePreview(api, active, report);
 const panes = new PaneControls(
   api,
@@ -131,6 +146,7 @@ function showLogin() {
   $('session-menu').open = false;
   state.loggedIn = false;
   plugins.reset([]);
+  attention.reset();
   panes.reset();
   disconnect();
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -140,13 +156,27 @@ function showLogin() {
   resources.reset();
 }
 
+function ordered(items) {
+  const sort = $('session-sort').value;
+  return items.sort(
+    (a, b) =>
+      Number(b.pinned) - Number(a.pinned) ||
+      (a.pinned ? 0 : a.group.localeCompare(b.group)) ||
+      (sort === 'name'
+        ? a.name.localeCompare(b.name)
+        : sort === 'activity'
+          ? b.activity - a.activity
+          : b.created - a.created) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
 function filteredSessions() {
   const query = $('filter-query').value.trim().toLowerCase();
   const group = $('filter-group').value;
   const status = $('filter-status').value;
-  const sort = $('session-sort').value;
-  return state.sessions
-    .filter((item) => {
+  return ordered(
+    state.sessions.filter((item) => {
       if (
         query &&
         ![item.name, item.group, item.cwd, item.note, ...item.tags]
@@ -163,18 +193,12 @@ function filteredSessions() {
       if (status === 'detached' && (item.clients || item.status !== 'running')) return false;
       if (status === 'pinned' && !item.pinned) return false;
       return true;
-    })
-    .sort(
-      (a, b) =>
-        Number(b.pinned) - Number(a.pinned) ||
-        (a.pinned ? 0 : a.group.localeCompare(b.group)) ||
-        (sort === 'name'
-          ? a.name.localeCompare(b.name)
-          : sort === 'activity'
-            ? b.activity - a.activity
-            : b.created - a.created) ||
-        a.id.localeCompare(b.id),
-    );
+    }),
+  );
+}
+
+function basename(path) {
+  return path.replace(/\/+$/, '').split('/').pop() || '/';
 }
 
 function groupOptions() {
@@ -221,7 +245,8 @@ function syncPanes() {
         );
         button.append(heading, plugins.render(item.id, pane.id));
         button.addEventListener('click', () => selectPane(item.id, pane.id).catch(report));
-        const menu = el('button', 'pane-menu', '⋯');
+        const menu = el('button', 'pane-menu');
+        menu.append(icon('more'));
         menu.setAttribute('aria-label', `管理分屏 ${pane.id}`);
         menu.addEventListener('click', () => panes.open(item.id, pane.id));
         row.append(button, menu);
@@ -250,7 +275,10 @@ function syncPanes() {
       `${item.pane_count > 1 ? `${focused.id} · ` : ''}${focused.command || item.shell} · ${item.cwd}`,
     );
   $('restart-session').hidden = !item?.active_dead;
-  $('restart-session').textContent = item?.pane_count > 1 ? '重启分屏' : '重新启动';
+  text(
+    $('restart-session').querySelector('.label'),
+    item?.pane_count > 1 ? '重启分屏' : '重新启动',
+  );
   panes.sync(state.sessions);
 }
 
@@ -293,13 +321,18 @@ function render() {
     button.className = `session-item${state.active === item.id ? ' active' : ''}`;
     button.setAttribute('aria-current', String(state.active === item.id));
     button.dataset.sessionId = item.id;
+    button.dataset.pinned = String(item.pinned);
     button.title = `${item.name}\n${item.group || '未分组'} · 初始目录: ${item.cwd}\n${item.note || '双击编辑名称、分组和标签'}`;
-    const icon = el('span', 'session-icon', item.pinned ? '★' : '>_');
+    const glyph = el('span', 'session-icon', item.pinned ? '★' : '');
+    if (!item.pinned) glyph.append(icon('terminal'));
     const info = el('span', 'session-info');
     const title = el('strong', '', item.name);
     const dot = document.createElement('span');
     dot.className = `dot ${item.status === 'exited' ? 'muted' : ''}`;
-    info.append(title);
+    const meta = [item.shell, basename(item.cwd)];
+    if (item.pane_count > 1) meta.push(`${item.pane_count} 个分屏`);
+    if (item.status === 'exited') meta.push('已退出');
+    info.append(title, el('span', 'session-meta', meta.join(' · ')));
     if (item.panes.length === 1) info.append(plugins.render(item.id, item.active_pane));
     if (item.tags.length) {
       const tags = el('span', 'session-tags');
@@ -308,7 +341,7 @@ function render() {
       }
       info.append(tags);
     }
-    button.append(icon, info, dot);
+    button.append(glyph, info, dot);
     button.addEventListener('click', () => select(item.id));
     button.addEventListener('dblclick', () => sessionDialog(item));
     row.append(button);
@@ -320,11 +353,11 @@ function render() {
       group.setAttribute('role', 'group');
       group.setAttribute('aria-label', `${item.name} 的分屏`);
       const toggle = el('button', 'pane-toggle');
+      toggle.append(icon('chevron-right'));
       toggle.dataset.collapseSession = item.id;
       toggle.setAttribute('aria-controls', group.id);
       const sync = () => {
         group.hidden = state.collapsed.has(item.id);
-        toggle.textContent = group.hidden ? '▸' : '▾';
         toggle.setAttribute('aria-expanded', String(!group.hidden));
         toggle.setAttribute('aria-label', `${group.hidden ? '展开' : '折叠'} ${item.name} 的分屏`);
         toggle.title = `${group.hidden ? '展开' : '折叠'}分屏`;
@@ -360,17 +393,22 @@ function render() {
       : '选择或新建一个终端';
   $('active-detail').title = item ? `初始目录: ${item.cwd}` : '';
   $('session-actions').hidden = !item || monitoring;
-  $('pin-session').textContent = item?.pinned ? '取消置顶' : '置顶';
+  text($('pin-session').querySelector('.label'), item?.pinned ? '取消置顶' : '置顶');
   $('restart-session').hidden = !item?.active_dead;
-  $('restart-session').textContent = item?.pane_count > 1 ? '重启分屏' : '重新启动';
+  text(
+    $('restart-session').querySelector('.label'),
+    item?.pane_count > 1 ? '重启分屏' : '重新启动',
+  );
   $('empty-state').hidden = !!item || monitoring;
   $('terminal').hidden = !item || monitoring;
   $('monitor-view').hidden = !monitoring;
   resources.setVisible(monitoring);
-  $('show-monitor').textContent = monitoring ? '返回终端' : '资源监控';
+  text($('monitor-label'), monitoring ? '返回终端' : '资源监控');
+  $('show-monitor').setAttribute('aria-pressed', String(monitoring));
   document.body.classList.toggle('resources-open', monitoring);
   if (monitoring) $('search-bar').hidden = true;
-  document.title = monitoring ? '资源监控 — LanTerm' : item ? `${item.name} — LanTerm` : 'LanTerm';
+  attention.title(monitoring ? '资源监控 — LanTerm' : item ? `${item.name} — LanTerm` : 'LanTerm');
+  attention.sync();
   syncPanes();
 }
 
@@ -453,6 +491,7 @@ function select(sid) {
   if (matchMedia('(max-width: 700px)').matches) setSidebar(true);
   state.view = 'terminal';
   if (state.active === sid && state.ws) {
+    attention.seen(sid, true);
     render();
     fit();
     state.term?.focus();
@@ -464,6 +503,7 @@ function select(sid) {
   localStorage.setItem('lt-active', sid);
   render();
   connect();
+  attention.seen(sid, true);
 }
 
 function connect() {
@@ -479,28 +519,7 @@ function connect() {
     lineHeight: 1.15,
     scrollback: 20000,
     allowProposedApi: true,
-    theme: {
-      background: '#111318',
-      foreground: '#d4dce5',
-      cursor: '#8fdfb1',
-      selectionBackground: '#455d5777',
-      black: '#20252e',
-      red: '#ee8a91',
-      green: '#99cc99',
-      yellow: '#e6c384',
-      blue: '#88ade6',
-      magenta: '#c3a1df',
-      cyan: '#7dc4ca',
-      white: '#d7dce3',
-      brightBlack: '#758190',
-      brightRed: '#ffabb0',
-      brightGreen: '#b4e6b4',
-      brightYellow: '#f2d8a3',
-      brightBlue: '#adc8f0',
-      brightMagenta: '#dcbeef',
-      brightCyan: '#a6e0e5',
-      brightWhite: '#f2f4f7',
-    },
+    theme: theme.terminalPalette(),
   });
   state.term = term;
   const fitAddon = new FitAddon();
@@ -590,7 +609,11 @@ function connect() {
       }
       return false;
     }
-    if (event.ctrlKey && event.shiftKey && ['KeyC', 'KeyV', 'KeyF', 'KeyK'].includes(event.code)) {
+    if (
+      event.ctrlKey &&
+      event.shiftKey &&
+      ['KeyC', 'KeyV', 'KeyF', 'KeyK', 'KeyP'].includes(event.code)
+    ) {
       if (event.type === 'keydown' && event.code === 'KeyC') {
         event.preventDefault();
         copySelection();
@@ -622,18 +645,52 @@ function fallbackCopy(text) {
   toast(ok ? '已复制' : '请使用浏览器的复制菜单');
 }
 
-function sessionDialog(item) {
+function agent(id) {
+  return (state.config?.agents || []).find((item) => item.id === id);
+}
+
+function launchChoice() {
+  return document.querySelector('input[name="launch"]:checked')?.value || '';
+}
+
+function defaultName(launch) {
+  const folder = basename($('session-cwd').value || state.config.cwd);
+  if (launch === 'claude') return `Claude · ${folder}`;
+  if (launch === 'codex') return `Codex · ${folder}`;
+  return `Terminal ${state.sessions.length + 1}`;
+}
+
+function syncLaunch() {
+  const launch = launchChoice();
+  $('session-command').hidden = launch !== 'custom';
+  $('session-command').required = launch === 'custom';
+  const found = agent(launch);
+  $('launch-hint').textContent = found
+    ? `Shell 启动后自动运行 ${found.command}${found.installed ? '' : '（服务的 PATH 中未找到，将按登录 Shell 的 PATH 运行）'}；程序退出后回到 Shell。`
+    : launch === 'custom'
+      ? 'Shell 启动后自动输入该命令并回车；程序退出后回到 Shell。'
+      : '启动登录 Shell，可随时运行 claude、codex 等工具。';
+  if (!state.editing && $('session-name').dataset.touched !== 'true')
+    $('session-name').value = defaultName(launch);
+}
+
+function sessionDialog(item, launch = '') {
   state.editing = item?.id || null;
   $('dialog-title').textContent = item ? '重命名会话' : '新建会话';
   $('session-submit').textContent = item ? '保存名称' : '创建会话';
   $('create-options').hidden = !!item;
-  $('session-name').value = item?.name || `Terminal ${state.sessions.length + 1}`;
+  $('session-name').dataset.touched = 'false';
+  for (const radio of document.querySelectorAll('input[name="launch"]'))
+    radio.checked = radio.value === launch;
+  $('session-command').value = '';
+  $('session-cwd').value = state.config.cwd;
+  $('session-name').value = item?.name || defaultName(launch);
   $('session-group').value = item?.group || '';
   $('session-tags').value = item?.tags.join(', ') || '';
   $('session-note').value = item?.note || '';
   $('session-shell').value = state.config.shell;
-  $('session-cwd').value = state.config.cwd;
   $('session-error').textContent = '';
+  syncLaunch();
   $('session-dialog').showModal();
   $('session-name').focus();
   $('session-name').select();
@@ -736,6 +793,10 @@ $('session-form').addEventListener('submit', async (event) => {
         ...body,
         shell: $('session-shell').value,
         cwd: $('session-cwd').value,
+        command:
+          launchChoice() === 'custom'
+            ? $('session-command').value.trim()
+            : agent(launchChoice())?.command || '',
       });
     $('session-dialog').close();
     state.sessions = await api('/sessions');
@@ -804,6 +865,181 @@ for (const button of document.querySelectorAll('[data-key]'))
   });
 bind('new-session', () => sessionDialog(null));
 bind('first-session', () => sessionDialog(null));
+for (const button of document.querySelectorAll('[data-launch]'))
+  button.addEventListener('click', () => sessionDialog(null, button.dataset.launch));
+for (const radio of document.querySelectorAll('input[name="launch"]'))
+  radio.addEventListener('change', () => {
+    syncLaunch();
+    if (launchChoice() === 'custom') $('session-command').focus();
+  });
+$('session-name').addEventListener('input', () => {
+  $('session-name').dataset.touched = 'true';
+});
+$('session-cwd').addEventListener('input', syncLaunch);
+bind('show-palette', () => palette.open());
+
+// Appearance and alert preferences.
+function syncSettings() {
+  for (const radio of document.querySelectorAll('input[name="theme"]'))
+    radio.checked = radio.value === theme.mode;
+  $('terminal-dark').checked = theme.terminal === 'dark';
+  $('notify-desktop').checked = attention.desktop;
+  $('notify-desktop').disabled = !attention.canNotify();
+  $('notify-sound').checked = attention.sound;
+  if (!attention.canNotify())
+    $('notify-note').textContent =
+      '桌面通知需要通过 HTTPS 或 localhost 访问；当前可使用页面内提醒和提示音。';
+}
+for (const radio of document.querySelectorAll('input[name="theme"]'))
+  radio.addEventListener('change', () => theme.set(radio.value));
+$('terminal-dark').addEventListener('change', () =>
+  theme.setTerminal($('terminal-dark').checked ? 'dark' : 'auto'),
+);
+$('notify-desktop').addEventListener('change', () =>
+  attention.setDesktop($('notify-desktop').checked).catch((error) => {
+    $('notify-desktop').checked = false;
+    report(error);
+  }),
+);
+$('notify-sound').addEventListener('change', () => attention.setSound($('notify-sound').checked));
+theme.subscribe(() => {
+  if (state.term) state.term.options.theme = theme.terminalPalette();
+  syncSettings();
+});
+syncSettings();
+
+async function splitActive(direction) {
+  const item = active();
+  if (!item) return;
+  await api(`/sessions/${item.id}/panes`, 'POST', { pane: item.active_pane, direction });
+  await refresh();
+  plugins.refresh();
+  state.term?.focus();
+}
+
+function paletteItems() {
+  const item = active();
+  const items = ordered([...state.sessions]).map((session) => ({
+    section: '会话',
+    icon: session.pinned ? 'star' : 'terminal',
+    title: session.name,
+    detail: `${session.group || '未分组'} · ${session.cwd}`,
+    keywords: [session.group, ...session.tags, session.note].join(' '),
+    badges: plugins.render(session.id),
+    shortcut: session.id === state.active ? '当前' : '',
+    run: () => select(session.id),
+  }));
+  items.push(
+    {
+      section: '新建',
+      icon: 'plus',
+      title: '新建会话',
+      shortcut: 'Ctrl ⇧ K',
+      run: () => sessionDialog(null),
+    },
+    {
+      section: '新建',
+      icon: 'sparkle',
+      title: '新建 Claude Code 会话',
+      keywords: 'claude agent anthropic',
+      run: () => sessionDialog(null, 'claude'),
+    },
+    {
+      section: '新建',
+      icon: 'hexagon',
+      title: '新建 Codex 会话',
+      keywords: 'codex agent openai',
+      run: () => sessionDialog(null, 'codex'),
+    },
+  );
+  if (item && state.view === 'terminal') {
+    const current = (entry) => items.push({ section: `当前会话 · ${item.name}`, ...entry });
+    current({
+      icon: 'columns',
+      title: '左右分屏',
+      keywords: 'split pane',
+      run: () => splitActive('horizontal'),
+    });
+    current({
+      icon: 'rows',
+      title: '上下分屏',
+      keywords: 'split pane',
+      run: () => splitActive('vertical'),
+    });
+    current({ icon: 'search', title: '搜索终端输出', shortcut: 'Ctrl ⇧ F', run: showSearch });
+    current({ icon: 'clipboard', title: '粘贴文本到终端', run: () => $('show-paste').click() });
+    current({
+      icon: 'file',
+      title: '预览文件',
+      keywords: 'preview open file',
+      run: () => $('show-files').click(),
+    });
+    current({
+      icon: 'history',
+      title: '终端历史',
+      keywords: 'history scrollback',
+      run: () => $('show-history').click(),
+    });
+    current({ icon: 'pencil', title: '重命名会话', run: () => sessionDialog(item) });
+    current({
+      icon: 'copy',
+      title: '复制会话',
+      keywords: 'duplicate',
+      run: () => $('duplicate-session').click(),
+    });
+    current({
+      icon: 'pin',
+      title: item.pinned ? '取消置顶' : '置顶会话',
+      run: () => $('pin-session').click(),
+    });
+    current({ icon: 'info', title: '会话详情与进程', run: () => $('session-details').click() });
+    current({
+      icon: 'trash',
+      title: '关闭会话…',
+      keywords: 'close kill',
+      run: () => $('close-session').click(),
+    });
+  }
+  const view = (entry) => items.push({ section: '视图与外观', ...entry });
+  view({
+    icon: 'activity',
+    title: state.view === 'resources' ? '返回终端' : '资源监控',
+    keywords: 'monitor cpu gpu memory',
+    run: () => $('show-monitor').click(),
+  });
+  view({
+    icon: 'panel-left',
+    title: '显示 / 隐藏侧栏',
+    keywords: 'sidebar',
+    run: () => $('toggle-sidebar').click(),
+  });
+  view({
+    icon: 'maximize',
+    title: '全屏',
+    keywords: 'fullscreen',
+    run: () => $('fullscreen').click(),
+  });
+  view({
+    icon: 'sun',
+    title: '浅色主题',
+    keywords: 'theme light 外观',
+    run: () => theme.set('light'),
+  });
+  view({
+    icon: 'moon',
+    title: '深色主题',
+    keywords: 'theme dark 外观',
+    run: () => theme.set('dark'),
+  });
+  view({
+    icon: 'display',
+    title: '主题跟随系统',
+    keywords: 'theme system auto 外观',
+    run: () => theme.set('system'),
+  });
+  return items;
+}
+const palette = new Palette(paletteItems, report);
 bind('rename-session', () => sessionDialog(active()));
 bind('pin-session', async () => {
   const item = active();
@@ -912,6 +1148,8 @@ bind('sidebar-backdrop', () => {
   $('toggle-sidebar').focus();
 });
 document.addEventListener('click', (event) => {
+  if ($('settings-menu').open && !$('settings-menu').contains(event.target))
+    $('settings-menu').open = false;
   const menu = $('session-menu');
   if (!menu.open) return;
   if (!menu.contains(event.target)) menu.open = false;
@@ -964,6 +1202,17 @@ document.addEventListener('keydown', (event) => {
     $('session-menu').querySelector('summary').focus();
     return;
   }
+  if (event.key === 'Escape' && $('settings-menu').open) {
+    event.preventDefault();
+    $('settings-menu').open = false;
+    $('settings-menu').querySelector('summary').focus();
+    return;
+  }
+  if (event.ctrlKey && event.shiftKey && event.code === 'KeyP') {
+    event.preventDefault();
+    palette.open();
+    return;
+  }
   if (
     event.key === 'Escape' &&
     matchMedia('(max-width: 700px)').matches &&
@@ -996,8 +1245,18 @@ document.addEventListener('visibilitychange', () => {
     refresh().catch(report);
     plugins.refresh();
     resources.resume();
+    attention.seen(state.active, false);
   }
 });
+window.addEventListener('focus', () => attention.seen(state.active, false));
+try {
+  // Hidden tabs throttle page timers heavily; a worker keeps alerts timely.
+  new Worker('static/ticker.js').addEventListener('message', () => {
+    if (document.hidden && state.loggedIn && attention.background()) plugins.refresh();
+  });
+} catch (error) {
+  console.warn('LanTerm background ticker unavailable', error);
+}
 setInterval(() => {
   if (!document.hidden) plugins.refresh();
 }, 500);

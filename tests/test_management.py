@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 
-from test_terminal import command
+from test_terminal import command, until
 
 from terminal.sessions import Sessions
 
@@ -100,3 +100,31 @@ async def test_old_session_metadata_is_upgraded_in_memory(server):
     assert restored["group"] == "" and restored["tags"] == [] and restored["note"] == ""
     await manager.rename(item["id"], "upgraded")
     assert (await manager.get(item["id"]))["name"] == "upgraded"
+
+
+async def test_launch_command_runs_in_the_new_shell_and_returns_to_it(server):
+    await server.login()
+    config = (await server.client.get("/api/config")).json()
+    assert {agent["id"]: agent["command"] for agent in config["agents"]} == {
+        "claude": "claude",
+        "codex": "codex",
+    }
+    multi = {"name": "multi", "shell": "bash", "cwd": str(server.config.cwd)}
+    response = await server.client.post("/api/sessions", json={**multi, "command": "true\nrm x"})
+    assert response.status_code == 422
+    response = await server.client.post(
+        "/api/sessions",
+        json={
+            **multi,
+            "name": "agent",
+            "command": 'sh -c \'printf "launched:%s\\n" "$0"; exit 3\' ok',
+        },
+    )
+    response.raise_for_status()
+    item = response.json()
+    assert "command" not in item
+    async with server.websocket(item["id"]) as ws:
+        await until(ws, b"launched:ok")
+        # The program ended; its login shell is still interactive.
+        await command(ws, "printf 'after:%s\\n' \"$?\"", b"after:3")
+    assert (await Sessions(server.config).get(item["id"]))["status"] == "running"

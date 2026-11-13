@@ -194,8 +194,15 @@ test('browser pairs two instances and preserves TCP over WS interruption', async
     await remotePage.getByRole('button', { name: '停止隧道', exact: true }).click();
     await closed;
     await expect(remotePage.locator('#command-panel')).toBeHidden();
+    // A user stop on the remote side ends the local pairing as well.
+    await expect(localPage.locator('#local-status')).toContainText('尚未配对');
+    await expect(localPage.locator('#revoke')).toBeHidden();
+    // The local page can also revoke a fresh pairing explicitly.
+    await localPage.getByRole('button', { name: '生成配对信息', exact: true }).click();
+    await expect(localPage.locator('#local-status')).toContainText('配对已生成');
     await localPage.locator('#revoke').click();
     await expect(localPage.locator('#local-status')).toContainText('尚未配对');
+    await expect(localPage.locator('#pair-output')).toBeHidden();
     expect(errors).toEqual([]);
   } finally {
     socket?.destroy();

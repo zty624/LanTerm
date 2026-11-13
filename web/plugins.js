@@ -2,9 +2,10 @@ import { el } from './dom.js';
 
 // Generic session badges: providers own their state names and labels on the server.
 export class SessionStatus {
-  constructor(api, loggedIn) {
+  constructor(api, loggedIn, changed) {
     this.api = api;
     this.loggedIn = loggedIn;
+    this.changed = changed;
     this.data = {};
     this.enabled = false;
     this.busy = false;
@@ -79,6 +80,7 @@ export class SessionStatus {
       const result = await this.api('/plugins/status', 'GET', undefined, controller.signal);
       if (generation !== this.generation) return;
       this.data = result.sessions;
+      this.changed(this.data);
     } catch (error) {
       if (generation !== this.generation) return;
       if (error.status === 401) this.data = {};

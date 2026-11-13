@@ -57,9 +57,10 @@ class Panes:
                 if "no space" in exc.stderr:
                     raise SessionError("分屏空间不足，请放大窗口或减少分屏", 409) from exc
                 raise
+            # ANSI palette colours follow the browser's light or dark terminal theme.
             for option, value in (
-                ("pane-border-style", "fg=#596674"),
-                ("pane-active-border-style", "fg=#8fdfb1"),
+                ("pane-border-style", "fg=brightblack"),
+                ("pane-active-border-style", "fg=yellow"),
                 ("pane-border-format", " #{pane_id} · #{pane_current_command} "),
                 ("pane-border-status", "top"),
             ):

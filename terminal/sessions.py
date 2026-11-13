@@ -173,7 +173,7 @@ class Sessions:
         encoded = base64.urlsafe_b64encode(json.dumps(meta).encode()).decode()
         await self.run(["set-option", "-t", f"lt-{sid}", "@lt_meta", encoded])
 
-    async def create(self, name: str, shell: str, cwd: str, options: dict) -> dict:
+    async def create(self, name: str, shell: str, cwd: str, options: dict, command: str) -> dict:
         path = await asyncio.to_thread(directory, cwd)
         shells = available_shells()
         if shell not in shells:
@@ -201,6 +201,11 @@ class Sessions:
                 ]
             )
             await self.metadata(sid, dict(name=name, shell=shell, cwd=str(path), **options))
+            if command:
+                # Typed ahead into the PTY: the shell reads it once started, records it in
+                # history, and remains when the program exits.
+                await self.run(["send-keys", "-t", f"lt-{sid}", "-l", command])
+                await self.run(["send-keys", "-t", f"lt-{sid}", "Enter"])
             return await self.get(sid)
 
     async def rename(self, sid: str, name: str) -> dict:
@@ -226,6 +231,7 @@ class Sessions:
             item["shell"],
             cwd,
             {"group": item["group"], "tags": item["tags"], "note": item["note"], "pinned": False},
+            "",
         )
 
     async def batch(self, ids: list[str], action: str, group: str) -> dict:

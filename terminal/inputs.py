@@ -43,6 +43,15 @@ class Create(Metadata):
     name: str = Field(min_length=1, max_length=80)
     shell: str
     cwd: str = Field(min_length=1, max_length=4096)
+    command: str = Field(default="", max_length=2000)
+
+    @field_validator("command")
+    @classmethod
+    def clean_command(cls, value: str) -> str:
+        # Typed into the new shell as one line; a newline would submit extra commands.
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("启动命令需为单行，且不能包含控制字符")
+        return value.strip()
 
 
 class Batch(BaseModel):

@@ -16,7 +16,7 @@ from pydantic import Field
 from starlette.requests import HTTPConnection
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
-from terminal.config import ASSETS, Config, available_shells
+from terminal.config import ASSETS, Config, agents, available_shells
 from terminal.files import media, preview
 from terminal.inputs import Batch, Create, Login, Metadata, PaneAction, Split
 from terminal.monitor import Monitor
@@ -188,6 +188,7 @@ def create_app(
             "cwd": str(config.cwd),
             "max_sessions": config.max_sessions,
             "plugins": status.catalog(),
+            "agents": agents(),
             "ssh": hub is not None,
             "experimental_ssh": hub is not None,
         }
@@ -211,7 +212,11 @@ def create_app(
     @api.post("/sessions", status_code=201)
     async def create(body: Create):
         return await sessions.create(
-            body.name, body.shell, body.cwd, body.model_dump(exclude={"name", "shell", "cwd"})
+            body.name,
+            body.shell,
+            body.cwd,
+            body.model_dump(exclude={"name", "shell", "cwd", "command"}),
+            body.command,
         )
 
     @api.patch("/sessions/{sid}")
