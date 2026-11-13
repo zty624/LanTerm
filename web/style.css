@@ -241,46 +241,90 @@ a {
 
 /* ── Login ────────────────────────────────────────────────────────────── */
 .login-screen {
+  position: relative;
   display: grid;
   place-items: center;
   height: 100%;
   padding: 24px;
-  background:
-    radial-gradient(ellipse 80% 55% at 50% -10%, var(--accent-soft), transparent 70%), var(--bg);
+  overflow: auto;
+  background: var(--bg);
+}
+/* scene.js paints an ASCII landscape with rising sky lanterns behind the card. */
+.login-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 .login-card {
-  width: 400px;
+  position: relative;
+  width: 360px;
   max-width: 100%;
-  padding: 36px 34px 30px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  padding: 26px 28px 26px;
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
   border-radius: 18px;
+  background: color-mix(in oklab, var(--surface) 84%, transparent);
   box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
 }
-.login-card .eyebrow {
-  margin-top: 22px;
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+}
+.login-brand img {
+  flex-shrink: 0;
+}
+.login-host {
+  margin-left: auto;
+  min-width: 0;
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-3);
+  font: 400 11.5px var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.login-host:empty {
+  display: none;
 }
 .login-card h1 {
+  margin: 26px 0 4px;
   font-family: var(--font-serif);
+  font-size: 30px;
   font-weight: 500;
-  font-size: 34px;
-  margin: 6px 0 0;
-}
-.login-card > p {
-  margin: 8px 0 18px;
 }
 .login-card .primary {
   width: 100%;
   justify-content: space-between;
   padding: 11px 15px;
-  margin-top: 4px;
 }
-.login-card small {
-  display: block;
-  text-align: center;
-  color: var(--text-3);
-  margin-top: 22px;
-  font-size: 12px;
+.empty-lantern {
+  width: 76px;
+  margin-bottom: 18px;
+  filter: drop-shadow(0 0 18px rgb(255 150 70 / 0.4));
+}
+@keyframes lantern-flicker {
+  0%,
+  45%,
+  100% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 0.84;
+  }
+  70% {
+    opacity: 0.92;
+  }
 }
 
 /* ── Workspace and sidebar ────────────────────────────────────────────── */
@@ -1306,7 +1350,7 @@ a {
 }
 .empty-state h2 {
   font-size: 32px;
-  margin: 0;
+  margin: 0 0 28px;
 }
 .empty-state > p {
   max-width: 460px;
@@ -3477,7 +3521,8 @@ th[aria-sort='descending'] .sort-button .icon {
 }
 @media (prefers-reduced-motion: reduce) {
   .plugin-badge::before,
-  .notice {
+  .notice,
+  .pixel-lantern rect {
     animation: none !important;
   }
   .meter > span {

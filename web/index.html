@@ -12,15 +12,17 @@
   </head>
   <body>
     <section id="login-screen" class="login-screen">
+      <canvas id="login-scene" class="login-scene" aria-hidden="true"></canvas>
       <form id="login-form" class="login-card">
-        <img
-          class="brand-icon"
-          src="static/lantern.svg"
-          alt="LanTerm 灯笼 Logo"
-          width="56"
-          height="56"
-        />
-        <h1>LanTerm</h1>
+        <div class="login-brand">
+          <img src="static/lantern.svg" alt="" width="26" height="26" />
+          <span>LanTerm</span>
+          <span id="login-host" class="login-host"></span>
+        </div>
+        <h1>
+          <span class="sr-only">LanTerm ·</span>
+          欢迎回来
+        </h1>
         <label for="password">访问密码</label>
         <input id="password" type="password" required autocomplete="current-password" autofocus />
         <p id="login-error" class="form-error" role="alert"></p>
@@ -210,7 +212,7 @@
           </button>
           <div class="session-heading">
             <strong id="active-name">工作空间</strong>
-            <span id="active-detail">选择或新建一个终端</span>
+            <span id="active-detail"></span>
           </div>
           <div class="toolbar-actions" id="session-actions" hidden>
             <button id="show-panes" class="tool-button" title="左右 / 上下分屏，管理当前窗口">
@@ -313,14 +315,7 @@
             </button>
           </div>
           <div id="empty-state" class="empty-state">
-            <img
-              class="brand-icon"
-              src="static/lantern.svg"
-              alt=""
-              width="52"
-              height="52"
-              aria-hidden="true"
-            />
+            <span class="empty-lantern" data-pixel="lantern"></span>
             <h2 class="display">今天从哪里开始？</h2>
             <div class="launch-grid">
               <button id="first-session" class="launch-card">

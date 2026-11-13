@@ -11,11 +11,16 @@ import { Palette } from './palette.js';
 import { Changes } from './changes.js';
 import { Attention } from './attention.js';
 import { hydrateIcons, icon } from './icons.js';
+import { hydratePixels } from './pixel.js';
+import { LoginScene } from './scene.js';
 import { theme } from './theme.js';
 import { $, el, reconcile, text } from './dom.js';
 import './style.css';
 
 hydrateIcons(document);
+hydratePixels(document);
+$('login-host').textContent = location.host;
+const scene = new LoginScene($('login-scene'), theme.resolved());
 
 const encoder = new TextEncoder();
 const state = {
@@ -154,6 +159,7 @@ function showLogin() {
   for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
   $('workspace').hidden = true;
   $('login-screen').hidden = false;
+  scene.start();
   $('password').focus();
   resources.reset();
 }
@@ -377,7 +383,7 @@ function render() {
     }
   }
   if (!visible.length) {
-    const empty = el('p', 'monitor-note', '没有匹配的会话');
+    const empty = el('p', 'monitor-note', state.sessions.length ? '没有匹配的会话' : '暂无会话');
     fragment.append(empty);
   }
   $('session-list').replaceChildren(fragment);
@@ -388,11 +394,7 @@ function render() {
   const monitoring = state.view === 'resources';
   if (monitoring || !item) $('session-menu').open = false;
   $('active-name').textContent = monitoring ? '资源监控' : item?.name || '工作空间';
-  $('active-detail').textContent = monitoring
-    ? ''
-    : item
-      ? `${item.shell}  ·  ${item.cwd}`
-      : '选择或新建一个终端';
+  $('active-detail').textContent = monitoring ? '' : item ? `${item.shell}  ·  ${item.cwd}` : '';
   $('active-detail').title = item ? `初始目录: ${item.cwd}` : '';
   $('session-actions').hidden = !item || monitoring;
   text($('pin-session').querySelector('.label'), item?.pinned ? '取消置顶' : '置顶');
@@ -445,6 +447,7 @@ async function enter() {
   plugins.refresh();
   $('password').value = '';
   $('login-screen').hidden = true;
+  scene.stop();
   $('workspace').hidden = false;
   $('host-label').textContent = location.host;
   $('session-shell').replaceChildren(
@@ -901,7 +904,8 @@ $('notify-desktop').addEventListener('change', () =>
   }),
 );
 $('notify-sound').addEventListener('change', () => attention.setSound($('notify-sound').checked));
-theme.subscribe(() => {
+theme.subscribe((resolved) => {
+  scene.setTheme(resolved);
   if (state.term) state.term.options.theme = theme.terminalPalette();
   syncSettings();
 });
