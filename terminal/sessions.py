@@ -126,7 +126,8 @@ class Sessions:
                     index=int(index),
                     active=active == "1",
                     dead=dead == "1",
-                    pid=int(process),
+                    # tmux 3.8 reports no pid for a dead pane kept by remain-on-exit.
+                    pid=int(process) if process else None,
                     tty=tty,
                     cols=int(cols),
                     rows=int(rows),

@@ -148,17 +148,25 @@ class CodexStatus:
         self.logs = {path: reader for path, reader in self.logs.items() if path in used}
         return result
 
+    def identity(self, pane: Pane) -> tuple[str, str, int | None]:
+        # tmux 3.8 clears the pid of a dead pane; keep the identity it had while alive.
+        if pane.pid is None:
+            return next((key for key in self.last if key[:2] == pane.key[:2]), pane.key)
+        return pane.key
+
     async def sample(self, panes: list[Pane]) -> dict[str, list[dict]]:
         inspected = await asyncio.to_thread(self.inspect, panes)
         result: dict[str, list[dict]] = {}
         now = time.time()
-        live = {pane.key for pane in panes}
+        keys = {pane.id: self.identity(pane) for pane in panes}
+        live = set(keys.values())
         self.last = {pane: badges for pane, badges in self.last.items() if pane in live}
         self.exited = {pane: stamp for pane, stamp in self.exited.items() if pane in live}
         for pane in panes:
+            key = keys[pane.id]
             badges = inspected[pane.id]
             if badges:
-                self.exited.pop(pane.key, None)
+                self.exited.pop(key, None)
                 try:
                     title = await self.sessions.run(
                         ["display-message", "-p", "-t", pane.id, "#{pane_title}"]
@@ -170,17 +178,17 @@ class CodexStatus:
                 # One pane title cannot identify two concurrent CLIs in the same pane.
                 if len(badges) == 1 and signal and badges[0]["state"] != "paused":
                     badges[0].update(state=signal, source="terminal_title")
-                self.last[pane.key] = badges
-            elif pane.key in self.last:
-                ended = self.exited.setdefault(pane.key, now)
+                self.last[key] = badges
+            elif key in self.last:
+                ended = self.exited.setdefault(key, now)
                 if now - ended < 30:
                     badges = [
                         {**badge, "state": "exited", "source": "process"}
-                        for badge in self.last[pane.key]
+                        for badge in self.last[key]
                     ]
                 else:
-                    self.last.pop(pane.key)
-                    self.exited.pop(pane.key)
+                    self.last.pop(key)
+                    self.exited.pop(key)
             for badge in badges:
                 state = badge["state"]
                 detail = ""

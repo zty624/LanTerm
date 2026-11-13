@@ -6,12 +6,12 @@ from typing import Protocol
 class Pane:
     session: str
     id: str
-    pid: int
+    pid: int | None
     dead: bool
     tty: str
 
     @property
-    def key(self) -> tuple[str, str, int]:
+    def key(self) -> tuple[str, str, int | None]:
         return self.session, self.id, self.pid
 
 
