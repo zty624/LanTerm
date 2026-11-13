@@ -22,7 +22,9 @@ def main() -> None:
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--max-sessions", type=int, default=32)
     parser.add_argument("--public-url", default="", help="反向代理后的完整访问地址，含路径前缀")
-    parser.add_argument("--plugins", default="codex", help="状态插件，逗号分隔；none 关闭全部插件")
+    parser.add_argument(
+        "--plugins", default="codex,claude", help="状态插件，逗号分隔；none 关闭全部插件"
+    )
     parser.add_argument(
         "--ssh",
         "--experimental-ssh",

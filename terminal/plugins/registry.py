@@ -2,10 +2,11 @@ import asyncio
 import time
 
 from terminal.plugins.base import Pane, StatusPlugin
+from terminal.plugins.claude import ClaudeStatus
 from terminal.plugins.codex import CodexStatus
 from terminal.sessions import Sessions
 
-PROVIDERS = {"codex": CodexStatus}
+PROVIDERS = {"codex": CodexStatus, "claude": ClaudeStatus}
 
 
 class Plugins:

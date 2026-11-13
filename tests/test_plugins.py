@@ -167,3 +167,73 @@ def test_rollout_partial_writes_rotation_and_large_tool_output(tmp_path):
     assert reader.read() == "working"
     path.write_bytes(b"new incompatible format\n")
     assert reader.read() == "unknown"
+
+
+CLAUDE = Path(__file__).parent / "fixtures/claude_process.py"
+
+
+def claude(server, *args: str) -> str:
+    config = server.config.state / "claude-config"
+    return shlex.join(["env", f"CLAUDE_CONFIG_DIR={config}", sys.executable, str(CLAUDE), *args])
+
+
+async def test_claude_registry_states_privacy_pause_and_exit(server):
+    await server.login()
+    item = await server.create("claude", "bash")
+    other = await server.create("plain shell", "bash")
+    async with server.websocket(item["id"]) as ws:
+        await command(ws, claude(server), b"fixture:ready")
+        idle = await status(server, item["id"], "waiting_input")
+        assert (idle["plugin"], idle["name"], idle["source"]) == (
+            "claude",
+            "Claude",
+            "session_registry",
+        )
+        for key, state, label in [
+            (b"w", "working", "Working · 工作中"),
+            (b"p", "needs_attention", "等待授权"),
+            (b"e", "needs_attention", "等待回答"),
+            (b"d", "waiting_input", "等待输入"),
+            (b"o", "needs_attention", "等待操作"),
+            (b"x", "unknown", "状态未知"),
+            (b"w", "working", "Working · 工作中"),
+        ]:
+            await ws.send(key)
+            async with asyncio.timeout(8):
+                while (await status(server, item["id"], state))["label"] != label:
+                    await asyncio.sleep(0.1)
+        # A torn write keeps the last complete state instead of flickering.
+        await ws.send(b"g")
+        for _ in range(5):
+            await asyncio.sleep(0.3)
+            await status(server, item["id"], "working")
+        await ws.send(b"i")
+        badge = await status(server, item["id"], "waiting_input")
+        os.kill(badge["pid"], signal.SIGSTOP)
+        try:
+            await status(server, item["id"], "paused")
+        finally:
+            await ws.send(b"fg\r")
+        await status(server, item["id"], "waiting_input")
+        # After job control the line discipline may be canonical again.
+        await ws.send(b"q\r")
+        await status(server, item["id"], "exited")
+    manager = server.app.state.sessions
+    assert (await manager.get(item["id"]))["status"] == "running"
+    snapshot = await Plugins(manager, ["claude"], 0.0).get()
+    assert other["id"] not in snapshot["sessions"]
+
+
+@pytest.mark.parametrize(
+    "args", [["--kind", "print"], ["--stale"], ["--no-file"]], ids=["print", "stale", "no-file"]
+)
+async def test_claude_helpers_and_stale_registry_files_get_no_badge(server, args):
+    await server.login()
+    item = await server.create("not interactive", "bash")
+    async with server.websocket(item["id"]) as ws:
+        await command(ws, claude(server, *args), b"fixture:ready")
+        for _ in range(6):
+            response = await server.client.get("/api/plugins/status")
+            assert item["id"] not in response.json()["sessions"]
+            await asyncio.sleep(0.25)
+        await ws.send(b"q")

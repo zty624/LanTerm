@@ -2,11 +2,11 @@
 
 <img src="web/lantern.svg" width="48" alt="LanTerm 灯笼" />
 
-基于 tmux 的内网 Web 终端，支持 Bash / Zsh、Vim、Codex。浏览器断开后，会话继续运行。
+基于 tmux 的内网 Web 终端，支持 Bash / Zsh、Vim、Codex 与 Claude Code。浏览器断开后，会话继续运行。
 
 - tmux 分屏；会话重命名、分组、标签、置顶、复制和批量管理。
 - CPU、内存、GPU 与会话进程监控。
-- Codex 状态插件：工作中、等待输入、暂停等。
+- Codex / Claude Code 状态插件：工作中、等待输入、等待授权、暂停等。
 - 点击终端文件路径预览高亮代码、Markdown（图表与公式）、JSON 结构、图片、表格、PDF、音视频和目录。
 
 ## 运行

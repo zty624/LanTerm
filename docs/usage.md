@@ -9,7 +9,7 @@
 | `--cwd` | `launch.sh` 默认使用仓库目录 |
 | `--state-dir` | 默认位于用户运行目录，存放密码与 tmux socket |
 | `--max-sessions` | `32`，每个会话最多 8 个浏览器连接 |
-| `--plugins` | 默认 `codex`；`none` 关闭插件 |
+| `--plugins` | 默认 `codex,claude`；`none` 关闭插件 |
 | `--public-url` | 反向代理的完整访问地址，见 [容器部署](cluster.md) |
 
 `LAN_TERMINAL_PASSWORD` 可指定访问密码，至少 12 个字符。否则自动生成 `access-token`，路径见启动日志。

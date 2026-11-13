@@ -1,29 +1,18 @@
 """Codex adapter. Uses local process ownership, lifecycle events and OSC titles."""
 
-import asyncio
 import logging
 import re
 import subprocess
-import time
 from pathlib import Path
 
 import psutil
 
+from terminal.plugins.agent import AgentStatus
 from terminal.plugins.base import Pane
 from terminal.plugins.rollout import Rollout, is_root
 from terminal.sessions import Sessions
 
 LOG = logging.getLogger(__name__)
-LABELS = {
-    "starting": "启动中",
-    "working": "Working · 工作中",
-    "waiting_input": "等待输入",
-    "needs_attention": "等待确认 / 输入",
-    "interrupted": "已中断 · 等待输入",
-    "paused": "已暂停",
-    "exited": "已退出",
-    "unknown": "状态未知",
-}
 SPINNER = re.compile(r"^(?:● )?[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏](?:\s|$)")
 ACTION = re.compile(r"^(?:● )?\[ [!.] \] Action Required(?:\s|$)")
 STATUS = re.compile(r"^(?:codex\s*[|·]\s*)?(Starting|Working|Thinking|Waiting|Ready)(?:\s*[|·]|$)")
@@ -41,51 +30,23 @@ def title_state(title: str) -> str | None:
     return {"Starting": "starting", "Ready": "waiting_input"}.get(match[1], "working")
 
 
-def tty_device(pid: int) -> int:
-    # /proc stat field 7 is the controlling tty, after the parenthesized comm.
-    fields = Path(f"/proc/{pid}/stat").read_bytes().rsplit(b") ", 1)[1].split()
-    return int(fields[4]) & 0xFFFFFFFF
-
-
-class CodexStatus:
+class CodexStatus(AgentStatus):
     id = "codex"
     name = "Codex 状态"
-    version = "1.1.0"
+    version = "1.2.0"
+    title = "Codex"
+    process = "codex"
 
     def __init__(self, sessions: Sessions):
-        self.sessions = sessions
+        super().__init__(sessions)
         self.logs: dict[Path, Rollout] = {}
-        self.last: dict[tuple[str, str, int], list[dict]] = {}
-        self.exited: dict[tuple[str, str, int], float] = {}
 
-    def processes(self, pane: Pane) -> list[psutil.Process] | None:
-        if pane.dead:
-            return []
-        try:
-            root = psutil.Process(pane.pid)
-            children = [root, *root.children(recursive=True)]
-            device = Path(pane.tty).stat().st_rdev
-        except (psutil.NoSuchProcess, FileNotFoundError):
-            return []
-        except (psutil.AccessDenied, PermissionError):
-            return None
-        found: list[psutil.Process] = []
-        for proc in children:
-            try:
-                # psutil's cached tty path map can omit PTYs created after its first sample.
-                if proc.name() != "codex" or tty_device(proc.pid) != device:
-                    continue
-                if any(arg in {"app-server", "mcp-server"} for arg in proc.cmdline()[1:3]):
-                    continue
-                # A Codex tool can itself start another Codex; prefer the outer CLI.
-                if any(parent.pid in {p.pid for p in found} for parent in proc.parents()):
-                    continue
-                found.append(proc)
-            except (psutil.NoSuchProcess, FileNotFoundError):
-                continue
-            except (psutil.AccessDenied, PermissionError):
-                return None
-        return found
+    def helper(self, proc: psutil.Process) -> bool:
+        return any(arg in {"app-server", "mcp-server"} for arg in proc.cmdline()[1:3])
+
+    def state(self, proc: psutil.Process, used: set) -> dict:
+        state, source = self.lifecycle(proc, used)
+        return {"state": state, "source": source}
 
     def lifecycle(self, proc: psutil.Process, used: set[Path]) -> tuple[str, str]:
         paths = []
@@ -122,89 +83,27 @@ class CodexStatus:
             self.logs[path] = Rollout(path)
         return self.logs[path].read(), "lifecycle"
 
-    def inspect(self, panes: list[Pane]) -> dict[str, list[dict]]:
-        result = {}
-        used: set[Path] = set()
-        for pane in panes:
-            badges = []
-            processes = self.processes(pane)
-            if processes is None:
-                result[pane.id] = [
-                    {**badge, "state": "unknown", "source": "process"}
-                    for badge in self.last.get(pane.key, [])
-                ]
-                continue
-            for proc in processes:
-                try:
-                    state, source = self.lifecycle(proc, used)
-                    if proc.status() == psutil.STATUS_STOPPED:
-                        state, source = "paused", "process"
-                    badges.append({"pid": proc.pid, "state": state, "source": source})
-                except psutil.NoSuchProcess:
-                    continue
-                except (psutil.AccessDenied, FileNotFoundError, PermissionError):
-                    badges.append({"pid": proc.pid, "state": "unknown", "source": "process"})
-            result[pane.id] = badges
+    def prune(self, used: set) -> None:
         self.logs = {path: reader for path, reader in self.logs.items() if path in used}
-        return result
 
-    def identity(self, pane: Pane) -> tuple[str, str, int | None]:
-        # tmux 3.8 clears the pid of a dead pane; keep the identity it had while alive.
-        if pane.pid is None:
-            return next((key for key in self.last if key[:2] == pane.key[:2]), pane.key)
-        return pane.key
+    async def refine(self, pane: Pane, badges: list[dict]) -> None:
+        # One pane title cannot identify two concurrent CLIs in the same pane.
+        if len(badges) != 1 or badges[0]["state"] == "paused":
+            return
+        try:
+            title = await self.sessions.run(
+                ["display-message", "-p", "-t", pane.id, "#{pane_title}"]
+            )
+        except subprocess.CalledProcessError:
+            LOG.debug("Pane disappeared during Codex status sampling: %s", pane.id)
+            return
+        signal = title_state(title)
+        if signal:
+            badges[0].update(state=signal, source="terminal_title")
 
-    async def sample(self, panes: list[Pane]) -> dict[str, list[dict]]:
-        inspected = await asyncio.to_thread(self.inspect, panes)
-        result: dict[str, list[dict]] = {}
-        now = time.time()
-        keys = {pane.id: self.identity(pane) for pane in panes}
-        live = set(keys.values())
-        self.last = {pane: badges for pane, badges in self.last.items() if pane in live}
-        self.exited = {pane: stamp for pane, stamp in self.exited.items() if pane in live}
-        for pane in panes:
-            key = keys[pane.id]
-            badges = inspected[pane.id]
-            if badges:
-                self.exited.pop(key, None)
-                try:
-                    title = await self.sessions.run(
-                        ["display-message", "-p", "-t", pane.id, "#{pane_title}"]
-                    )
-                    signal = title_state(title)
-                except subprocess.CalledProcessError:
-                    LOG.debug("Pane disappeared during Codex status sampling: %s", pane.id)
-                    signal = None
-                # One pane title cannot identify two concurrent CLIs in the same pane.
-                if len(badges) == 1 and signal and badges[0]["state"] != "paused":
-                    badges[0].update(state=signal, source="terminal_title")
-                self.last[key] = badges
-            elif key in self.last:
-                ended = self.exited.setdefault(key, now)
-                if now - ended < 30:
-                    badges = [
-                        {**badge, "state": "exited", "source": "process"}
-                        for badge in self.last[key]
-                    ]
-                else:
-                    self.last.pop(key)
-                    self.exited.pop(key)
-            for badge in badges:
-                state = badge["state"]
-                detail = ""
-                if state == "unknown":
-                    detail = "已检测到 Codex，当前版本或权限未提供可识别的状态信号"
-                elif state == "needs_attention":
-                    detail = "Codex 请求操作；请打开终端查看审批或问题"
-                result.setdefault(pane.session, []).append(
-                    {
-                        **badge,
-                        "plugin": self.id,
-                        "name": "Codex",
-                        "pane": pane.id,
-                        "label": LABELS[state],
-                        "detail": detail,
-                        "observed_at": now,
-                    }
-                )
-        return result
+    def detail(self, state: str) -> str:
+        if state == "unknown":
+            return "已检测到 Codex，当前版本或权限未提供可识别的状态信号"
+        if state == "needs_attention":
+            return "Codex 请求操作；请打开终端查看审批或问题"
+        return ""
