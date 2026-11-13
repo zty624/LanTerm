@@ -200,7 +200,7 @@ export class FilePreview {
     this.clear();
     $('preview-title').textContent = '文件预览';
     $('preview-kind').textContent = 'FILE';
-    $('preview-note').textContent = '读取 LanTerm 主机上的文件；相对路径按所选分屏的当前目录解析。';
+    $('preview-note').textContent = '';
     $('preview-error').textContent = '';
     $('preview-path').value = value?.path || raw;
     $('preview-parent').disabled = true;
@@ -252,8 +252,8 @@ export class FilePreview {
       $('preview-parent').disabled = data.path === '/';
       $('preview-note').textContent =
         data.kind === 'directory'
-          ? `LanTerm 主机 · ${data.entries.length} 项${data.truncated ? ' · 仅显示前 500 项' : ''}`
-          : `LanTerm 主机 · ${data.size < 1024 ? `${data.size} B` : `${(data.size / 1024).toFixed(1)} KiB`} · 只读${data.truncated && data.kind === 'text' ? ' · 仅预览前 1 MiB' : ''}`;
+          ? `${data.entries.length} 项${data.truncated ? ' · 仅显示前 500 项' : ''}`
+          : `${data.size < 1024 ? `${data.size} B` : `${(data.size / 1024).toFixed(1)} KiB`}${data.truncated && data.kind === 'text' ? ' · 仅预览前 1 MiB' : ''}`;
       const content = $('preview-content');
       content.dataset.kind = data.kind;
       if (data.kind === 'table') {
@@ -273,8 +273,6 @@ export class FilePreview {
         const url = new URL(`api/sessions/${this.sid}/file/content?${params}`, location.href);
         $('preview-external').href = url.href;
         $('preview-external').hidden = false;
-        if (data.kind === 'pdf')
-          $('preview-note').textContent += ' · 浏览器 PDF 阅读器；无法内嵌时可在新标签页打开';
         renderMedia(data, url.href, (message) => {
           if (generation === this.generation) $('preview-error').textContent = message;
         });

@@ -45,6 +45,11 @@
   --violet: #7a55b0;
   --violet-soft: #ece4f6;
   --term-bg: #fbfaf6;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-track: #e3edf9;
+  --status-warn: #fab219;
+  --status-critical: #d03b3b;
   --overlay: rgb(35 30 22 / 0.32);
   --shadow-sm: 0 1px 2px rgb(40 32 20 / 0.06);
   --shadow-md: 0 8px 24px rgb(40 32 20 / 0.1), 0 1px 3px rgb(40 32 20 / 0.06);
@@ -93,6 +98,9 @@
     --violet-soft: #2d2540;
     --term-bg: #1b1a18;
     --overlay: rgb(8 7 6 / 0.62);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-track: #26313f;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow-md: 0 8px 24px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.3);
     --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
@@ -140,6 +148,9 @@
   --violet-soft: #2d2540;
   --term-bg: #1b1a18;
   --overlay: rgb(8 7 6 / 0.62);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-track: #26313f;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
   --shadow-md: 0 8px 24px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.3);
   --shadow-lg: 0 24px 64px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);

@@ -17,14 +17,6 @@
         <span>LanTerm / SSH</span>
       </header>
       <h1>从本机连接远端 SSH</h1>
-      <p class="intro">用浏览器接通远端，再用本机的终端、SFTP 或开发工具连接。</p>
-      <div class="route" aria-label="连接路线">
-        <span>你的电脑</span>
-        <b>→</b>
-        <span>浏览器桥接</span>
-        <b>→</b>
-        <span>远端 SSH</span>
-      </div>
       <p id="settings" class="caption" role="status">正在读取配置…</p>
       <form id="login" hidden>
         <h2>登录当前 LanTerm</h2>
@@ -46,7 +38,6 @@
           </button>
         </div>
         <section id="local-panel" hidden>
-          <p class="hint">本机指你正在使用浏览器的电脑。两边页面都在这台电脑的浏览器里打开。</p>
           <form id="pair-form">
             <h2>
               <span class="step">1</span>
@@ -61,18 +52,14 @@
                 required
               />
             </label>
-            <p class="caption">复制远端终端页面的完整地址，保留平台的路径前缀。</p>
             <button id="pair-submit">生成配对信息</button>
-            <p id="replace-note" class="caption" hidden>
-              当前已有配对。生成新配对会断开旧的 SSH 连接。
-            </p>
+            <p id="replace-note" class="caption" hidden>将替换当前配对并断开旧连接</p>
           </form>
           <section id="pair-output" class="card" hidden>
             <h2>
               <span class="step">2</span>
               复制信息，去远端接通
             </h2>
-            <p>先复制，再打开远端页面粘贴。如果出现平台或 LanTerm 登录页，请先登录。</p>
             <label>
               配对信息
               <textarea id="pair-code" readonly rows="3" spellcheck="false"></textarea>
@@ -88,7 +75,7 @@
                 打开远端页面 ↗
               </a>
             </div>
-            <p class="caption">含临时凭证，仅粘贴到你要连接的远端页面。</p>
+            <p class="caption">含临时凭证，勿分享</p>
           </section>
           <section class="card">
             <h2>
@@ -96,12 +83,11 @@
               接通后，回到本机终端
             </h2>
             <p id="local-status" role="status">等待生成配对信息。</p>
-            <p class="caption">远端页面会提供 SSH 命令。连接期间保持远端页面打开。</p>
+            <p class="caption">连接期间保持远端页面打开</p>
             <button id="revoke" class="secondary" type="button" hidden>停止本机配对</button>
           </section>
         </section>
         <section id="remote-panel" hidden>
-          <p class="hint">这是要登录的远端。请保持此页面打开，它负责连接你的电脑与远端 SSH。</p>
           <form id="connect-form">
             <h2>
               <span class="step">1</span>
@@ -138,9 +124,7 @@
               </label>
               <code id="command"></code>
               <button id="copy-command" type="button" disabled>复制 SSH 命令</button>
-              <p class="caption">
-                在你的电脑上执行。使用远端的 SSH 密码或密钥，与 LanTerm 访问密码不同。
-              </p>
+              <p class="caption">使用远端 SSH 凭证，不是 LanTerm 密码</p>
             </div>
             <button id="stop" type="button" class="secondary" disabled>停止隧道</button>
             <details>

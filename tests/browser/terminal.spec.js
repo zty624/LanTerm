@@ -701,12 +701,27 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
         },
       ],
     };
+    const mib = 1024 ** 2;
     data.history = Array.from({ length: 12 }, (_, index) => ({
       timestamp: data.timestamp - (12 - index) * 30,
       cpu: 18 + 6 * Math.sin(index),
       memory: (6 + index * 0.15) * gib,
+      rx: (8 + index) * mib,
+      tx: mib,
+      read: 20 * mib,
+      write: 2 * mib,
+      gpu: { 'test-gpu': { utilization: 40 + index, memory: 2 * gib } },
     }));
-    data.history.push({ timestamp: data.timestamp, cpu, memory });
+    data.history.push({
+      timestamp: data.timestamp,
+      cpu,
+      memory,
+      rx: 12 * mib,
+      tx: mib,
+      read: 32 * mib,
+      write: 2 * mib,
+      gpu: { 'test-gpu': { utilization, memory: 2 * gib } },
+    });
     await route.fulfill({ json: data });
   });
   const overview = page.locator('#sidebar #resource-overview');
@@ -767,6 +782,17 @@ test('resource gauges match their labels and refresh preserves focus and scroll'
     'aria-valuenow',
     '25',
   );
+  // Trend charts read out any sample on hover or keyboard focus.
+  const network = page.locator('.metric-card[data-key="network"] .trend');
+  await expect(network).toHaveAttribute('aria-label', /接收 12\.0 MiB\/s/);
+  await network.focus();
+  const tip = network.locator('.trend-tip');
+  await expect(tip).toContainText('12.0 MiB/s');
+  await expect(tip).toContainText('发送');
+  await page.keyboard.press('ArrowLeft');
+  await expect(tip).toContainText('19.0 MiB/s');
+  await page.locator('[data-sort="cpu"]').click();
+  await expect(page.locator('th[aria-sort="descending"]')).toContainText('CPU');
   const button = page
     .locator('#session-resources')
     .getByRole('button', { name: '进程', exact: true });

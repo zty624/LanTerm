@@ -106,13 +106,10 @@ export class Changes {
     }
     const added = data.files.reduce((sum, file) => sum + (file.added || 0), 0);
     const deleted = data.files.reduce((sum, file) => sum + (file.deleted || 0), 0);
-    const parts = [
-      data.root,
-      data.head ? `HEAD ${data.head}` : '尚无提交',
-      `${data.files.length}${data.truncated ? '+' : ''} 个文件`,
-    ];
+    const parts = [`${data.files.length}${data.truncated ? '+' : ''} 个文件`];
     if (added || deleted) parts.push(`+${added} −${deleted}`);
     text($('changes-summary'), parts.join(' · '));
+    $('changes-summary').title = `${data.root}\n${data.head ? `HEAD ${data.head}` : '尚无提交'}`;
   }
 
   list() {

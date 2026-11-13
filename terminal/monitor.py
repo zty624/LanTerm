@@ -253,6 +253,17 @@ class Monitor:
                 timestamp=result["timestamp"],
                 cpu=result["cpu"]["percent"],
                 memory=group["memory_used"],
+                rx=result["network"]["rx_rate"],
+                tx=result["network"]["tx_rate"],
+                read=io_read,
+                write=io_write,
+                gpu={
+                    device["uuid"]: {
+                        "utilization": device["utilization"],
+                        "memory": device["memory_used"],
+                    }
+                    for device in gpu["devices"]
+                },
             )
         )
         result["history"] = list(self.history)

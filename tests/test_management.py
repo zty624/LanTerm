@@ -85,6 +85,10 @@ async def test_resources_require_login_and_include_real_child_process(server):
         second = (await server.client.get("/api/metrics")).json()
         assert second["cpu"]["percent"] is not None
         assert len(second["history"]) >= 2
+        # Rates appear once two samples exist; the latest entry carries every trend.
+        latest = second["history"][-1]
+        assert latest["rx"] is not None and latest["tx"] is not None
+        assert {"cpu", "memory", "read", "write", "gpu"} <= latest.keys()
         detail = (await server.client.get(f"/api/sessions/{item['id']}")).json()
         assert detail["resources"]["process_count"] >= 2
 

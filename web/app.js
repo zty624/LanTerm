@@ -389,7 +389,7 @@ function render() {
   if (monitoring || !item) $('session-menu').open = false;
   $('active-name').textContent = monitoring ? '资源监控' : item?.name || '工作空间';
   $('active-detail').textContent = monitoring
-    ? '容器配额 · GPU · Session 进程'
+    ? ''
     : item
       ? `${item.shell}  ·  ${item.cwd}`
       : '选择或新建一个终端';
@@ -667,11 +667,9 @@ function syncLaunch() {
   $('session-command').hidden = launch !== 'custom';
   $('session-command').required = launch === 'custom';
   const found = agent(launch);
-  $('launch-hint').textContent = found
-    ? `Shell 启动后自动运行 ${found.command}${found.installed ? '' : '（服务的 PATH 中未找到，将按登录 Shell 的 PATH 运行）'}；程序退出后回到 Shell。`
-    : launch === 'custom'
-      ? 'Shell 启动后自动输入该命令并回车；程序退出后回到 Shell。'
-      : '启动登录 Shell，可随时运行 claude、codex 等工具。';
+  $('launch-options').title = found
+    ? `在新 Shell 中运行 ${found.command}${found.installed ? '' : '（服务 PATH 中未找到，按登录 Shell 的 PATH 运行）'}`
+    : '';
   if (!state.editing && $('session-name').dataset.touched !== 'true')
     $('session-name').value = defaultName(launch);
 }
@@ -889,8 +887,7 @@ function syncSettings() {
   $('notify-desktop').disabled = !attention.canNotify();
   $('notify-sound').checked = attention.sound;
   if (!attention.canNotify())
-    $('notify-note').textContent =
-      '桌面通知需要通过 HTTPS 或 localhost 访问；当前可使用页面内提醒和提示音。';
+    $('notify-desktop-label').title = '桌面通知需要通过 HTTPS 或 localhost 访问';
 }
 for (const radio of document.querySelectorAll('input[name="theme"]'))
   radio.addEventListener('change', () => theme.set(radio.value));
@@ -1090,6 +1087,9 @@ bind('show-monitor', () => {
   }
 });
 bind('monitor-refresh', () => resources.refresh());
+$('resource-overview').addEventListener('click', () => {
+  if (state.view !== 'resources') $('show-monitor').click();
+});
 for (const id of ['filter-query', 'filter-group', 'filter-status', 'session-sort'])
   $(id).addEventListener(id === 'filter-query' ? 'input' : 'change', render);
 bind('clear-filters', () => {

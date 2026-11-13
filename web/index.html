@@ -20,24 +20,14 @@
           width="56"
           height="56"
         />
-        <span class="eyebrow">Your shell, in your browser</span>
         <h1>LanTerm</h1>
-        <p>连接你的工作环境，接着上次的地方继续。</p>
         <label for="password">访问密码</label>
-        <input
-          id="password"
-          type="password"
-          required
-          autocomplete="current-password"
-          autofocus
-          placeholder="输入服务器的访问密码"
-        />
+        <input id="password" type="password" required autocomplete="current-password" autofocus />
         <p id="login-error" class="form-error" role="alert"></p>
         <button type="submit" class="primary">
           连接终端
           <span data-icon="arrow-right"></span>
         </button>
-        <small>真实 Shell · 独立会话 · 断线保留</small>
       </form>
     </section>
 
@@ -62,24 +52,18 @@
               hidden
             >
               <span data-icon="link"></span>
-              SSH 连接
+              SSH
             </a>
           </div>
         </div>
-        <button id="new-session" class="new-session">
+        <button id="new-session" class="new-session" title="新建会话 · Ctrl+Shift+K">
           <span data-icon="plus"></span>
           新建会话
-          <kbd>Ctrl ⇧ K</kbd>
         </button>
         <div class="session-filters">
           <div class="search-field">
             <span data-icon="search"></span>
-            <input
-              id="filter-query"
-              type="search"
-              aria-label="搜索会话"
-              placeholder="搜索名称、标签、目录…"
-            />
+            <input id="filter-query" type="search" aria-label="搜索会话" placeholder="搜索会话" />
           </div>
           <details id="filter-options" class="filter-options">
             <summary>
@@ -120,11 +104,12 @@
           <button id="batch-close" class="danger-subtle">关闭所选</button>
         </div>
         <div id="session-list" role="list" aria-label="终端会话"></div>
-        <section id="resource-overview" class="resource-overview" aria-label="CPU 和内存概览">
-          <div class="overview-heading">
-            <span>资源概览</span>
-            <span id="overview-updated">正在读取…</span>
-          </div>
+        <section
+          id="resource-overview"
+          class="resource-overview"
+          aria-label="CPU 和内存概览"
+          title="打开资源监控"
+        >
           <div class="overview-cards">
             <article class="overview-card" data-key="cpu">
               <div class="overview-numbers">
@@ -132,7 +117,7 @@
                   <span>CPU</span>
                   <strong class="overview-value">—</strong>
                 </div>
-                <span class="overview-detail">正在读取…</span>
+                <span class="overview-detail"></span>
               </div>
               <div class="overview-trend"></div>
             </article>
@@ -142,11 +127,12 @@
                   <span>内存</span>
                   <strong class="overview-value">—</strong>
                 </div>
-                <span class="overview-detail">正在读取…</span>
+                <span class="overview-detail"></span>
               </div>
               <div class="overview-trend"></div>
             </article>
           </div>
+          <span id="overview-updated" hidden>正在读取…</span>
         </section>
         <div class="sidebar-footer">
           <span class="dot"></span>
@@ -184,8 +170,12 @@
                 <input id="terminal-dark" type="checkbox" />
                 浅色主题下终端保持深色
               </label>
-              <div class="settings-title">Agent 提醒</div>
-              <label class="toggle-row">
+              <div class="settings-title">提醒</div>
+              <label
+                class="toggle-row"
+                id="notify-desktop-label"
+                title="Agent 完成或请求授权时提醒"
+              >
                 <input id="notify-desktop" type="checkbox" />
                 桌面通知
               </label>
@@ -193,9 +183,6 @@
                 <input id="notify-sound" type="checkbox" />
                 提示音
               </label>
-              <p id="notify-note" class="settings-note">
-                Claude Code、Codex 完成任务或请求授权时提醒，页面在后台也会检查。
-              </p>
             </div>
           </details>
           <button
@@ -228,23 +215,23 @@
           <div class="toolbar-actions" id="session-actions" hidden>
             <button id="show-panes" class="tool-button" title="左右 / 上下分屏，管理当前窗口">
               <span data-icon="columns"></span>
-              <span class="tool-label">分屏</span>
+              <span class="sr-only">分屏</span>
             </button>
             <button id="show-search" class="tool-button" title="搜索当前终端缓冲区 · Ctrl+Shift+F">
               <span data-icon="search"></span>
-              <span class="tool-label">搜索</span>
+              <span class="sr-only">搜索</span>
             </button>
             <button id="show-paste" class="tool-button" title="粘贴文本；也可直接使用 Ctrl+Shift+V">
               <span data-icon="clipboard"></span>
-              <span class="tool-label">粘贴</span>
+              <span class="sr-only">粘贴</span>
             </button>
             <button id="show-keys" class="tool-button" title="发送被浏览器占用的控制键">
               <span data-icon="keyboard"></span>
-              <span class="tool-label">按键</span>
+              <span class="sr-only">按键</span>
             </button>
             <button id="show-changes" class="tool-button" title="查看分屏当前 Git 仓库的未提交变更">
               <span data-icon="branch"></span>
-              <span class="tool-label">变更</span>
+              <span class="sr-only">变更</span>
             </button>
             <button id="restart-session" hidden>
               <span data-icon="restart"></span>
@@ -253,7 +240,6 @@
             <details id="session-menu" class="session-menu">
               <summary aria-label="更多会话操作" title="更多会话操作">
                 <span data-icon="more"></span>
-                <span class="tool-label" aria-hidden="true">更多</span>
               </summary>
               <div class="session-menu-items">
                 <span class="menu-label">当前会话</span>
@@ -297,12 +283,16 @@
               title="命令面板 · Ctrl+Shift+P"
             >
               <span data-icon="command"></span>
-              <span class="tool-label">命令</span>
-              <kbd>Ctrl ⇧ P</kbd>
+              <span class="sr-only">命令面板</span>
             </button>
-            <button id="show-monitor" class="tool-button monitor-toggle" aria-pressed="false">
+            <button
+              id="show-monitor"
+              class="tool-button monitor-toggle"
+              aria-pressed="false"
+              title="资源监控"
+            >
               <span data-icon="activity"></span>
-              <span class="tool-label" id="monitor-label">资源监控</span>
+              <span class="sr-only" id="monitor-label">资源监控</span>
             </button>
             <button id="fullscreen" class="icon-button" title="全屏" aria-label="全屏">
               <span data-icon="maximize"></span>
@@ -332,39 +322,19 @@
               aria-hidden="true"
             />
             <h2 class="display">今天从哪里开始？</h2>
-            <p>
-              启动 Shell、Claude Code 或 Codex。会话由 tmux 持有，关闭页面后依然运行，回来接着用。
-            </p>
             <div class="launch-grid">
               <button id="first-session" class="launch-card">
                 <span data-icon="terminal"></span>
                 <strong>创建第一个会话</strong>
-                <small>Bash / Zsh 终端</small>
               </button>
               <button class="launch-card" data-launch="claude">
                 <span data-icon="sparkle"></span>
                 <strong>启动 Claude Code</strong>
-                <small>新会话中运行 claude</small>
               </button>
               <button class="launch-card" data-launch="codex">
                 <span data-icon="hexagon"></span>
                 <strong>启动 Codex</strong>
-                <small>新会话中运行 codex</small>
               </button>
-            </div>
-            <div class="empty-hint">
-              <span>
-                <kbd>Ctrl ⇧ K</kbd>
-                新建会话
-              </span>
-              <span>
-                <kbd>Ctrl ⇧ P</kbd>
-                命令面板
-              </span>
-              <span>
-                <kbd>Shift</kbd>
-                拖选复制
-              </span>
             </div>
           </div>
           <div id="terminal" hidden aria-label="交互终端"></div>
@@ -372,69 +342,59 @@
             <div class="monitor-content">
               <div class="monitor-heading">
                 <div>
-                  <span class="eyebrow">Resource monitor</span>
-                  <h2>资源总览</h2>
-                  <p id="monitor-scope">正在读取运行环境…</p>
+                  <h2>资源监控</h2>
+                  <p id="monitor-scope"></p>
                 </div>
                 <div class="monitor-update">
-                  <span id="monitor-updated">正在采样</span>
-                  <button id="monitor-refresh" title="获取最新的资源采样">
+                  <span id="monitor-updated" class="live-pill"></span>
+                  <button
+                    id="monitor-refresh"
+                    class="icon-button"
+                    aria-label="刷新资源采样"
+                    title="刷新"
+                  >
                     <span data-icon="refresh"></span>
-                    刷新
                   </button>
                 </div>
               </div>
               <p id="monitor-error" class="form-error" role="alert"></p>
-              <p id="monitor-warmup" class="monitor-note" hidden>
-                正在采集速率，下一次采样后自动显示。
-              </p>
               <div id="metric-cards" class="metric-cards"></div>
               <div class="monitor-section-heading">
-                <h3>GPU 设备</h3>
-                <span>设备整体用量，可能包含其他进程</span>
+                <h3 id="gpu-heading">GPU</h3>
               </div>
               <div id="gpu-cards" class="gpu-cards"></div>
               <p id="gpu-note" class="monitor-empty" hidden></p>
-              <p id="gpu-scope" class="monitor-note" hidden></p>
               <div class="monitor-section-heading">
                 <h3>
-                  会话资源
+                  会话
                   <span id="resource-session-count" class="count-badge"></span>
                 </h3>
-                <span>CPU 100% = 1 核 · 内存为进程树 RSS 合计</span>
               </div>
               <div class="table-scroll">
-                <table class="resource-table">
+                <table class="resource-table sessions-table">
                   <thead>
                     <tr>
                       <th>会话</th>
-                      <th>分组</th>
-                      <th>状态</th>
-                      <th>进程数</th>
-                      <th>CPU</th>
-                      <th>内存 RSS</th>
-                      <th>操作</th>
+                      <th class="numeric" title="会话进程树中的进程数">进程</th>
+                      <th aria-sort="none" title="100% = 1 个 CPU 核">
+                        <button class="sort-button" data-sort="cpu">
+                          CPU
+                          <span data-icon="arrow-down"></span>
+                        </button>
+                      </th>
+                      <th aria-sort="none" title="进程树 RSS 合计，共享页可能重复计算">
+                        <button class="sort-button" data-sort="memory">
+                          内存
+                          <span data-icon="arrow-down"></span>
+                        </button>
+                      </th>
+                      <th><span class="sr-only">操作</span></th>
                     </tr>
                   </thead>
                   <tbody id="session-resources"></tbody>
                 </table>
               </div>
-              <p id="session-resources-empty" class="monitor-empty" hidden>
-                暂无会话。新建终端后，这里会显示对应的进程资源。
-              </p>
-              <details class="monitor-help">
-                <summary>统计范围与说明</summary>
-                <p>
-                  CPU、内存和进程数优先统计当前
-                  cgroup，卡片会注明范围。工作目录存储为所在文件系统的用量，网络统计不含本地回环接口。GPU
-                  利用率和显存占用分别显示。
-                </p>
-                <p>
-                  共享内存页可能在多个进程的 RSS
-                  中重复计算；脱离会话进程树的进程不计入该会话。首次采样或页面长时间不可见后，速率需要下一次采样才能显示。不可读取的指标显示为
-                  —。
-                </p>
-              </details>
+              <p id="session-resources-empty" class="monitor-empty" hidden>暂无会话</p>
             </div>
           </section>
           <div id="reconnect-banner" class="reconnect-banner" hidden>
@@ -448,7 +408,6 @@
             <span id="connection-status">准备就绪</span>
           </span>
           <span id="terminal-size"></span>
-          <span class="keyboard-hint">Shift + 拖选复制 · 滚轮查看历史</span>
           <div class="status-tools">
             <div class="zoom" title="终端字号">
               <button id="zoom-out" aria-label="缩小字体">−</button>
@@ -480,31 +439,15 @@
         <input
           id="palette-input"
           aria-label="在命令面板中查找"
-          placeholder="切换会话、启动 Agent 或执行命令…"
+          placeholder="会话或命令"
           autocomplete="off"
           spellcheck="false"
           role="combobox"
           aria-controls="palette-list"
           aria-expanded="true"
         />
-        <kbd>Esc</kbd>
       </div>
       <div id="palette-list" role="listbox" aria-label="命令面板结果"></div>
-      <div class="palette-footer">
-        <span>
-          <kbd>↑</kbd>
-          <kbd>↓</kbd>
-          选择
-        </span>
-        <span>
-          <kbd>Enter</kbd>
-          执行
-        </span>
-        <span>
-          <kbd>Esc</kbd>
-          关闭
-        </span>
-      </div>
     </dialog>
 
     <dialog id="changes-dialog" class="changes-dialog" aria-labelledby="changes-title">
@@ -542,7 +485,6 @@
           <div id="changes-content" class="diff-view" tabindex="0" aria-label="差异内容"></div>
         </div>
       </div>
-      <p class="changes-note">只读：不暂存、不提交，也不修改工作区。</p>
     </dialog>
 
     <dialog id="preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
@@ -586,7 +528,7 @@
         <input
           id="preview-path"
           aria-label="文件路径"
-          placeholder="绝对路径，或相对于分屏当前目录的路径"
+          placeholder="文件路径"
           required
           autocomplete="off"
           spellcheck="false"
@@ -640,7 +582,7 @@
           </button>
         </div>
         <label for="session-name">会话名称</label>
-        <input id="session-name" maxlength="80" required placeholder="例如：Claude · 项目开发" />
+        <input id="session-name" maxlength="80" required />
         <div id="create-options">
           <span class="field-label" id="launch-label">启动程序</span>
           <div
@@ -683,9 +625,6 @@
             spellcheck="false"
             hidden
           />
-          <p id="launch-hint" class="launch-hint">
-            Shell 启动后自动输入该命令；程序退出后回到 Shell。
-          </p>
           <div class="form-columns">
             <div>
               <label for="session-shell">Shell</label>
@@ -700,25 +639,15 @@
         <div class="form-columns">
           <div>
             <label for="session-group">分组</label>
-            <input
-              id="session-group"
-              list="group-options"
-              maxlength="40"
-              placeholder="例如：训练 / 开发"
-            />
+            <input id="session-group" list="group-options" maxlength="40" />
           </div>
           <div>
             <label for="session-tags">标签</label>
-            <input id="session-tags" placeholder="逗号分隔，最多 8 个" />
+            <input id="session-tags" placeholder="逗号分隔" />
           </div>
         </div>
         <label for="session-note">备注</label>
-        <textarea
-          id="session-note"
-          rows="2"
-          maxlength="500"
-          placeholder="这个会话的用途…"
-        ></textarea>
+        <textarea id="session-note" rows="2" maxlength="500"></textarea>
         <p id="session-error" class="form-error" role="alert"></p>
         <div class="dialog-footer">
           <button type="button" data-dismiss>取消</button>
@@ -764,8 +693,7 @@
       <div id="details-summary" class="details-summary"></div>
       <p id="details-note"></p>
       <div class="monitor-section-heading">
-        <h3>会话进程</h3>
-        <span>CPU 100% = 1 核</span>
+        <h3>进程</h3>
       </div>
       <div class="table-scroll">
         <table class="resource-table">
@@ -804,7 +732,6 @@
         <button id="pane-restart" hidden>重新启动分屏</button>
         <button id="pane-close" class="danger-subtle">关闭此分屏</button>
       </div>
-      <p class="muted-text">新分屏沿用所选分屏的当前目录。点击终端切换焦点，拖动分隔线调整大小。</p>
       <div id="pane-confirm" hidden>
         <p>
           关闭分屏
@@ -827,7 +754,6 @@
           <strong id="close-name"></strong>
           」中的 Shell 和正在运行的程序将结束。
         </p>
-        <p class="muted-text">如果只是暂时离开，直接关闭浏览器页面即可。</p>
         <p id="close-error" class="form-error" role="alert"></p>
         <div class="dialog-footer">
           <button type="button" data-dismiss>保留会话</button>
@@ -844,7 +770,6 @@
             <span data-icon="x"></span>
           </button>
         </div>
-        <p>在下方粘贴文本，再发送到当前会话。</p>
         <textarea id="paste-text" rows="8" spellcheck="false" aria-label="待粘贴文本"></textarea>
         <div class="dialog-footer">
           <button type="button" data-dismiss>取消</button>
@@ -863,7 +788,6 @@
           </button>
         </div>
       </div>
-      <p>保留最近 20,000 行。全屏程序的当前画面可在终端中查看。</p>
       <pre id="history-content" tabindex="0"></pre>
     </dialog>
     <div id="notices" class="notices" aria-live="polite"></div>
