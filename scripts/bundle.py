@@ -38,6 +38,7 @@ def main() -> None:
             "uv.lock",
             "README.md",
             "AGENTS.md",
+            "CLAUDE.md",
             "docs/cluster.md",
             "docs/ssh.md",
             "docs/plugins.md",
